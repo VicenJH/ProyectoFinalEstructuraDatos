@@ -106,20 +106,6 @@ public class Cola<T> {
         return true;
     }
 
-    public static void quitarHombres30a50(Cola<Persona> cola) {
-        int n = cola.getSize();
 
-        for (int i = 0; i < n; i++) {
-            Persona p = cola.desencolar();
-
-            boolean quitar = p.getGenero() == Genero.MASCULINO
-                    && p.getEdad() >= 30
-                    && p.getEdad() <= 50;
-
-            if (!quitar) {
-                cola.encolar(p);
-            }
-        }
-    }
 
 }
