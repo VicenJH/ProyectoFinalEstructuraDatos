@@ -29,8 +29,8 @@ public class Stack<T> {
         if (isEmpty()) {
             top = newNode;
         }else{
-            newNode.setNext(top);   // el nuevo apunta al antiguo tope
-            top = newNode;          // el nuevo pasa a ser el tope
+            newNode.setNext(top);
+            top = newNode;
         }
         size++;
     }
