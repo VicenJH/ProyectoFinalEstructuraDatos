@@ -1,9 +1,12 @@
 package co.edu.uniquindio.proyectofinal;
 
 import javafx.application.Application;
+import javafx.stage.Stage;
 
-public class App {
-    public static void main(String[] args) {
+public class App extends Application {
+
+    @Override
+    public void start(Stage primaryStage) throws Exception {
 
     }
 }
