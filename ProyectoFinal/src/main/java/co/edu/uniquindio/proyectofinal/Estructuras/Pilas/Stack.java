@@ -1,7 +1,7 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.Pilas;
 
 
-import co.edu.uniquindio.poo.EjerciciosClase.Colas.Cola;
+import co.edu.uniquindio.proyectofinal.Estructuras.Colas.Cola;
 
 import java.util.Objects;
 
