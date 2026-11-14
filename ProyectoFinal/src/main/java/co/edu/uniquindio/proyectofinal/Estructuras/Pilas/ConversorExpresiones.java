@@ -1,4 +1,4 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Pilas;
+package co.edu.uniquindio.proyectofinal.Estructuras.Pilas;
 
 public class ConversorExpresiones {
 

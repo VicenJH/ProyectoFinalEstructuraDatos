@@ -1,4 +1,6 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Listas.SimpleList;
+package co.edu.uniquindio.proyectofinal.Estructuras.SimpleList;
+
+import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.NodeSimple;
 
 public class SimpleLinkedList {
 

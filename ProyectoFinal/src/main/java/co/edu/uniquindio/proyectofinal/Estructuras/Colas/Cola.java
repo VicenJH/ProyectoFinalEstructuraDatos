@@ -1,9 +1,9 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Colas;
+package co.edu.uniquindio.proyectofinal.Estructuras.Colas;
 
 public class Cola<T> {
 
     private int size;
-    private NodeSimple <T> firstNode;
+    private NodeSimple<T> firstNode;
     private NodeSimple <T> lastNode;
 
     public Cola() {

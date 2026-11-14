@@ -1,4 +1,4 @@
-package co.edu.uniquindio.poo.EjerciciosClase.ArbolBinario;
+package co.edu.uniquindio.proyectofinal.Estructuras.Arbol;
 
 import co.edu.uniquindio.poo.EjerciciosClase.Colas.Cola;
 

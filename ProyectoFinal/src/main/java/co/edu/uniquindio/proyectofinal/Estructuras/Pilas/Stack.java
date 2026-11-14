@@ -1,4 +1,4 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Pilas;
+package co.edu.uniquindio.proyectofinal.Estructuras.Pilas;
 
 
 import co.edu.uniquindio.poo.EjerciciosClase.Colas.Cola;

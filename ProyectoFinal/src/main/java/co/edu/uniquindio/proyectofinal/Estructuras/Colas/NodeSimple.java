@@ -1,11 +1,11 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Pilas;
+package co.edu.uniquindio.proyectofinal.Estructuras.Colas;
 
-public class Node<T> {
+public class NodeSimple<T> {
 
     private T data;
-    private Node<T> next;
+    private NodeSimple<T> next;
 
-    public Node(T data) {
+    public NodeSimple(T data) {
         this.data = data;
     }
 
@@ -17,11 +17,11 @@ public class Node<T> {
         this.data = data;
     }
 
-    public Node<T> getNext() {
+    public NodeSimple<T> getNext() {
         return next;
     }
 
-    public void setNext(Node<T> next) {
+    public void setNext(NodeSimple<T> next) {
         this.next = next;
     }
 }

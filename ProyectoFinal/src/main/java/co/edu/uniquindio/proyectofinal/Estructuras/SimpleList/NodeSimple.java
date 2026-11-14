@@ -1,4 +1,4 @@
-package co.edu.uniquindio.poo.EjerciciosClase.Listas.SimpleList;
+package co.edu.uniquindio.proyectofinal.Estructuras.SimpleList;
 
 public class NodeSimple {
 
