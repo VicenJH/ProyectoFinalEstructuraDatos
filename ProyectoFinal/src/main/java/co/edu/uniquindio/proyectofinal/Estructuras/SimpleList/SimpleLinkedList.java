@@ -1,5 +1,7 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.SimpleList;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 /**
@@ -7,8 +9,11 @@ import java.util.Objects;
  *
  * Mantiene referencias al primer y ultimo nodo para que addLast sea O(1).
  * Los enlaces se gestionan manualmente, sin utilizar colecciones de Java.
+ *
+ * Implementa Iterable para poder recorrerla con for-each en O(n); recorrerla
+ * con getNodeValue(i) cuesta O(n^2).
  */
-public class SimpleLinkedList<T> {
+public class SimpleLinkedList<T> implements Iterable<T> {
 
     private int size;
     private NodeSimple<T> firstNode;
@@ -121,5 +126,32 @@ public class SimpleLinkedList<T> {
         firstNode = null;
         lastNode = null;
         size = 0;
+    }
+
+    /**
+     * Recorre la lista de inicio a fin. No soporta eliminar durante el recorrido.
+     * Complejidad total del recorrido: O(n).
+     */
+    @Override
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            private NodeSimple<T> actual = firstNode;
+
+            @Override
+            public boolean hasNext() {
+                return actual != null;
+            }
+
+            @Override
+            public T next() {
+                if (actual == null) {
+                    throw new NoSuchElementException();
+                }
+
+                T dato = actual.getData();
+                actual = actual.getNext();
+                return dato;
+            }
+        };
     }
 }
