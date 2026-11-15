@@ -348,4 +348,68 @@ public class FintechController {
 
         System.out.println("⚠️ [ALERTA DE SEGURIDAD] Usuario: " + usuario.getNombre() + " - " + mensaje);
     }
+
+
+    /*
+     * Verifica mediante BFS (Búsqueda en Anchura) si hay una ruta de transferencias
+     * (directa o indirecta) entre un usuario origen y un usuario destino.
+     */
+    public boolean existeRutaTransferencias(String idOrigen, String idDestino) {
+        Grafo.Vertice<String> inicio = grafoTransferencias.buscarVertice(idOrigen);
+        Grafo.Vertice<String> fin = grafoTransferencias.buscarVertice(idDestino);
+
+        if (inicio == null || fin == null) return false;
+        if (idOrigen.equals(idDestino)) return true;
+
+        SimpleLinkedList<Grafo.Vertice<String>> cola = new SimpleLinkedList<>();
+        SimpleLinkedList<String> visitados = new SimpleLinkedList<>();
+
+        cola.addLast(inicio);
+        visitados.addLast(inicio.getDato());
+
+        while (!cola.isEmpty()) {
+            Grafo.Vertice<String> actual = cola.getNodeValue(0);
+
+            for (int i = 0; i < actual.getAdyacentes().getSize(); i++) {
+                Grafo.Arista<String> arista = actual.getAdyacentes().getNodeValue(i);
+                Grafo.Vertice<String> vecino = arista.getDestino();
+
+                if (vecino.getDato().equals(idDestino)) {
+                    return true;
+                }
+
+                boolean yaVisitado = false;
+                for (int j = 0; j < visitados.getSize(); j++) {
+                    if (visitados.getNodeValue(j).equals(vecino.getDato())) {
+                        yaVisitado = true;
+                        break;
+                    }
+                }
+
+                if (!yaVisitado) {
+                    visitados.addLast(vecino.getDato());
+                    cola.addLast(vecino);
+                }
+            }
+
+        }
+
+        return false;
+    }
+    /**
+     * Guarda un respaldo en formato de texto plano con la información general del sistema.
+     */
+    public void guardarRespaldoSistema(String rutaArchivo) {
+        try (java.io.PrintWriter writer = new java.io.PrintWriter(new java.io.File(rutaArchivo))) {
+            writer.println("=== REPORTE DE ESTADO FINTECH ===");
+            writer.println("Fecha de respaldo: " + java.time.LocalDateTime.now());
+            writer.println("Total usuarios en árbol de puntos: " + arbolUsuariosPorPuntos.obtenerPeso());
+
+            // Puedes recorrer tus estructuras principales y volcar su información aquí
+            writer.println("Sistema respaldado exitosamente.");
+            System.out.println("💾 Respaldo guardado correctamente en: " + rutaArchivo);
+        } catch (java.io.FileNotFoundException e) {
+            System.err.println("❌ Error al guardar el respaldo: " + e.getMessage());
+        }
+    }
 }
