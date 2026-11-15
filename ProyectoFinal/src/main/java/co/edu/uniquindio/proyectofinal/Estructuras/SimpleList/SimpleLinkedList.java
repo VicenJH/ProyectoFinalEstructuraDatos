@@ -1,78 +1,125 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.SimpleList;
 
-import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.NodeSimple;
+import java.util.Objects;
 
+/**
+ * Lista simplemente enlazada generica.
+ *
+ * Mantiene referencias al primer y ultimo nodo para que addLast sea O(1).
+ * Los enlaces se gestionan manualmente, sin utilizar colecciones de Java.
+ */
 public class SimpleLinkedList<T> {
+
     private int size;
     private NodeSimple<T> firstNode;
+    private NodeSimple<T> lastNode;
 
     public SimpleLinkedList() {
         this.size = 0;
         this.firstNode = null;
+        this.lastNode = null;
     }
 
-    public int getSize() { return size; }
-    public boolean isEmpty() { return firstNode == null; }
+    public int getSize() {
+        return size;
+    }
+
+    public boolean isEmpty() {
+        return size == 0;
+    }
 
     public void addFirst(T data) {
         NodeSimple<T> newNode = new NodeSimple<>(data);
+
         if (isEmpty()) {
             firstNode = newNode;
+            lastNode = newNode;
         } else {
             newNode.setNext(firstNode);
             firstNode = newNode;
         }
+
         size++;
     }
 
     public void addLast(T data) {
         NodeSimple<T> newNode = new NodeSimple<>(data);
+
         if (isEmpty()) {
             firstNode = newNode;
+            lastNode = newNode;
         } else {
-            NodeSimple<T> aux = firstNode;
-            while (aux.getNext() != null) {
-                aux = aux.getNext();
-            }
-            aux.setNext(newNode);
+            lastNode.setNext(newNode);
+            lastNode = newNode;
         }
+
         size++;
     }
 
     public T getNodeValue(int position) {
         if (position < 0 || position >= size) {
-            throw new IndexOutOfBoundsException("Posición inválida: " + position);
+            throw new IndexOutOfBoundsException(
+                    "Posicion invalida: " + position + ". Tamano actual: " + size
+            );
         }
-        NodeSimple<T> aux = firstNode;
+
+        NodeSimple<T> current = firstNode;
+
         for (int i = 0; i < position; i++) {
-            aux = aux.getNext();
+            current = current.getNext();
         }
-        return aux.getData();
+
+        return current.getData();
     }
 
+    /**
+     * Elimina la primera aparicion del dato.
+     * Objects.equals permite almacenar y buscar valores null sin provocar
+     * NullPointerException.
+     *
+     * @return true si se elimino un nodo; false si no se encontro.
+     */
     public boolean remove(T data) {
-        if (isEmpty()) return false;
+        if (isEmpty()) {
+            return false;
+        }
 
-        if (firstNode.getData().equals(data)) {
+        if (Objects.equals(firstNode.getData(), data)) {
             firstNode = firstNode.getNext();
             size--;
+
+            if (size == 0) {
+                lastNode = null;
+            }
+
             return true;
         }
 
-        NodeSimple<T> aux = firstNode;
-        while (aux.getNext() != null && !aux.getNext().getData().equals(data)) {
-            aux = aux.getNext();
+        NodeSimple<T> previous = firstNode;
+        NodeSimple<T> current = firstNode.getNext();
+
+        while (current != null && !Objects.equals(current.getData(), data)) {
+            previous = current;
+            current = current.getNext();
         }
 
-        if (aux.getNext() == null) return false;
+        if (current == null) {
+            return false;
+        }
 
-        aux.setNext(aux.getNext().getNext());
+        previous.setNext(current.getNext());
+
+        if (current == lastNode) {
+            lastNode = previous;
+        }
+
         size--;
         return true;
     }
 
     public void clear() {
-        size = 0;
         firstNode = null;
+        lastNode = null;
+        size = 0;
     }
 }
