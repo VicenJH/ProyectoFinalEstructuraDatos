@@ -5,8 +5,8 @@ import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.SimpleLinkedList;
 public class Grafo<T> {
 
     public static class Vertice<T> {
-        T dato;
-        SimpleLinkedList<Arista<T>> adyacentes;
+        private T dato; // Encapsulado
+        private SimpleLinkedList<Arista<T>> adyacentes; // Encapsulado
 
         public Vertice(T dato) {
             this.dato = dato;
@@ -14,11 +14,16 @@ public class Grafo<T> {
         }
 
         public T getDato() { return dato; }
+
+        // Getter necesario para acceder desde fuera del paquete
+        public SimpleLinkedList<Arista<T>> getAdyacentes() {
+            return adyacentes;
+        }
     }
 
     public static class Arista<T> {
-        Vertice<T> destino;
-        double peso; // Puede representar el monto total transferido
+        private Vertice<T> destino;
+        private double peso;
 
         public Arista(Vertice<T> destino, double peso) {
             this.destino = destino;
@@ -29,7 +34,7 @@ public class Grafo<T> {
         public double getPeso() { return peso; }
     }
 
-    private SimpleLinkedList<Vertice<T>> vertices;
+    private SimpleLinkedList<Vertice<T>> vertices; // Encapsulado
 
     public Grafo() {
         this.vertices = new SimpleLinkedList<>();
@@ -56,7 +61,8 @@ public class Grafo<T> {
         Vertice<T> vDestino = buscarVertice(destino);
 
         if (vOrigen != null && vDestino != null) {
-            vOrigen.adyacentes.addLast(new Arista<>(vDestino, peso));
+            // Usando el getter o accediendo de forma segura
+            vOrigen.getAdyacentes().addLast(new Arista<>(vDestino, peso));
         }
     }
 

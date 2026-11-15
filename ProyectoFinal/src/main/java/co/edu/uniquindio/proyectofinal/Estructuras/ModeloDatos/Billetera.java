@@ -45,4 +45,20 @@ public class Billetera {
     public void setActivo(boolean activo) {
         this.activo = activo;
     }
+
+
+
+    public void recargar(int monto) {
+        if (monto > 0) {
+            this.saldo += monto;
+        }
+    }
+
+    public boolean retirar(int monto) {
+        if (monto > 0 && this.saldo >= monto) {
+            this.saldo -= monto;
+            return true;
+        }
+        return false;
+    }
 }

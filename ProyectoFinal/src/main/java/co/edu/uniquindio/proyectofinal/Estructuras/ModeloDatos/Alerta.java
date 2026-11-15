@@ -1,12 +1,15 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos;
 
+
+import java.time.LocalDateTime;
+
 public class Alerta {
     public int id;
-    public int fecha;
+    public LocalDateTime fecha;
     public String mensaje;
     public String tipoAlerta;
 
-    public Alerta(int id, int fecha, String mensaje, String tipoAlerta) {
+    public Alerta(int id, LocalDateTime fecha, String mensaje, String tipoAlerta) {
         this.id = id;
         this.fecha = fecha;
         this.mensaje = mensaje;
@@ -21,11 +24,11 @@ public class Alerta {
         this.id = id;
     }
 
-    public int getFecha() {
+    public LocalDateTime getFecha() {
         return fecha;
     }
 
-    public void setFecha(int fecha) {
+    public void setFecha(LocalDateTime fecha) {
         this.fecha = fecha;
     }
 
