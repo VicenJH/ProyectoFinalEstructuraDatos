@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="co.edu.uniquindio.proyectofinal.Presentacion.Controladores.TestMonitorViewController"
+            styleClass="app-page">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16" styleClass="topbar">
+            <VBox spacing="2"><Label text="NEXO" styleClass="brand-small"/><Label text="MONITOR DE PRUEBAS" styleClass="eyebrow"/></VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Volver al inicio" onAction="#volverInicio" styleClass="ghost-button"/>
+        </HBox>
+    </top>
+    <center>
+        <VBox spacing="18" styleClass="page-content">
+            <VBox spacing="5"><Label text="Calidad y regresión" styleClass="page-title"/><Label text="Ejecuta las pruebas sobre instancias independientes. El estado de la billetera real no se modifica." styleClass="muted-label" wrapText="true"/></VBox>
+            <HBox spacing="12" styleClass="metric-strip"><VBox styleClass="metric-card" HBox.hgrow="ALWAYS"><Label text="GRUPOS" styleClass="eyebrow"/><Label fx:id="lblTotalGrupos" text="11" styleClass="metric-value"/></VBox><VBox styleClass="metric-card" HBox.hgrow="ALWAYS"><Label text="APROBADOS" styleClass="eyebrow"/><Label fx:id="lblAprobados" text="0" styleClass="metric-value"/></VBox><VBox styleClass="metric-card" HBox.hgrow="ALWAYS"><Label text="FALLIDOS" styleClass="eyebrow"/><Label fx:id="lblFallidos" text="0" styleClass="metric-value"/></VBox><VBox styleClass="metric-card" HBox.hgrow="ALWAYS"><Label text="DURACIÓN" styleClass="eyebrow"/><Label fx:id="lblDuracion" text="0 ms" styleClass="metric-value"/></VBox></HBox>
+            <VBox spacing="10" styleClass="surface-card"><HBox alignment="CENTER_LEFT"><Label fx:id="lblEstado" text="Listo para ejecutar" styleClass="section-title"/><Region HBox.hgrow="ALWAYS"/><Button fx:id="btnEjecutar" text="Ejecutar suite completa" onAction="#ejecutarPruebas" styleClass="primary-button"/></HBox><ProgressBar fx:id="barraProgreso" progress="0" maxWidth="Infinity"/><Label fx:id="lblProgreso" text="12 grupos · miles de comprobaciones · tiempos por grupo" styleClass="muted-label"/></VBox>
+            <TableView fx:id="tablaResultados" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colResultadoNombre" text="Grupo de pruebas"/><TableColumn fx:id="colResultadoEstado" text="Resultado"/><TableColumn fx:id="colResultadoTiempo" text="Tiempo"/><TableColumn fx:id="colResultadoComprobaciones" text="Comprobaciones"/><TableColumn fx:id="colResultadoDetalle" text="Detalle"/></columns></TableView>
+            <HBox alignment="CENTER_LEFT"><Label fx:id="lblResumen" text="Aún no se han ejecutado pruebas." styleClass="muted-label"/><Region HBox.hgrow="ALWAYS"/><Button text="Limpiar resultados" onAction="#limpiarResultados" styleClass="outline-button"/></HBox>
+        </VBox>
+    </center>
+</BorderPane>

@@ -1,78 +1,82 @@
-
 package co.edu.uniquindio.proyectofinal;
 
-import co.edu.uniquindio.proyectofinal.Estructuras.Controllers.FintechController;
-import co.edu.uniquindio.proyectofinal.vistas.*;
-import javafx.application.Application;
-import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
-import javafx.scene.layout.BorderPane;
-import javafx.stage.Stage;
+import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
+import co.edu.uniquindio.proyectofinal.Presentacion.Controladores.LoginViewController;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 
-/**
- * Ventana principal de la plataforma Fintech.
- *
- * Todos los paneles comparten un único FintechController, que es la fachada
- * del sistema. Al cambiar de pestaña, el panel se actualiza con el estado actual.
- */
+import java.io.IOException;
+import java.util.function.BiConsumer;
+
+/** Punto de entrada JavaFX. Inicializa persistencia y el procesador de operaciones. */
 public class App extends Application {
 
-    private final FintechController controlador = new FintechController();
-    private TabPane pestanas;
+    private ContextoAplicacion contexto;
     private Timeline procesadorAutomatico;
 
     @Override
     public void start(Stage escenario) {
-        pestanas = new TabPane(
-                new Tab("Usuarios y billeteras", new PanelUsuarios(controlador)),
-                new Tab("Operaciones", new PanelOperaciones(controlador))
-        );
-        pestanas.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        pestanas.getSelectionModel().selectedItemProperty().addListener((obs, anterior, pestana) -> {
-            if (pestana != null && pestana.getContent() instanceof Refrescable) {
-                ((Refrescable) pestana.getContent()).refrescar();
-            }
-        });
-
-        MenuItem cargarDemo = new MenuItem("Cargar datos de ejemplo");
-        cargarDemo.setOnAction(e -> cargarDatosDeEjemplo());
-
-        MenuBar menu = new MenuBar(new Menu("Datos", null, cargarDemo));
-
-        BorderPane raiz = new BorderPane(pestanas);
-        raiz.setTop(menu);
-
-        escenario.setTitle("Fintech - Billeteras digitales");
-        escenario.setScene(new Scene(raiz, 1150, 720));
-        escenario.show();
-        iniciarProcesamientoAutomatico();
+        try {
+            contexto = ContextoAplicacion.iniciar();
+            mostrarVentana(escenario, contexto, "/fxml/inicio.fxml", "NEXO · Billetera digital",
+                    1120, 760, (controller, stage) ->
+                            ((LoginViewController) controller).configurar(contexto, stage));
+            iniciarProcesamientoAutomatico();
+        } catch (IOException | RuntimeException ex) {
+            Alert alerta = new Alert(Alert.AlertType.ERROR);
+            alerta.setTitle("No se pudo iniciar NEXO");
+            alerta.setHeaderText("Error al cargar los datos del sistema");
+            alerta.setContentText(ex.getMessage() == null ? "Error inesperado al iniciar." : ex.getMessage());
+            alerta.showAndWait();
+            escenario.close();
+        }
     }
 
-    /**
-     * Simula el reloj de la plataforma y procesa operaciones vencidas cada segundo.
-     * Timeline ejecuta el callback en el hilo JavaFX, por lo que se pueden refrescar
-     * los paneles sin acceder desde un hilo externo.
-     */
+    public static Stage mostrarVentana(Stage ventanaAnterior, ContextoAplicacion contexto,
+                                       String recursoFxml, String titulo, double ancho, double alto,
+                                       BiConsumer<Object, Stage> configurarControlador) {
+        try {
+            FXMLLoader loader = new FXMLLoader(App.class.getResource(recursoFxml));
+            Parent raiz = loader.load();
+            Stage nueva = new Stage();
+            Scene escena = new Scene(raiz, ancho, alto);
+            var css = App.class.getResource("/css/fintech.css");
+            if (css != null) escena.getStylesheets().add(css.toExternalForm());
+            nueva.setTitle(titulo);
+            nueva.setMinWidth(980);
+            nueva.setMinHeight(680);
+            nueva.setScene(escena);
+            if (configurarControlador != null) configurarControlador.accept(loader.getController(), nueva);
+            nueva.show();
+            if (ventanaAnterior != null) ventanaAnterior.close();
+            return nueva;
+        } catch (IOException ex) {
+            Alert alerta = new Alert(Alert.AlertType.ERROR);
+            alerta.setTitle("Error de navegación");
+            alerta.setHeaderText("No se pudo abrir la pantalla");
+            alerta.setContentText("Recurso: " + recursoFxml + "\n" + ex.getMessage());
+            alerta.showAndWait();
+            return ventanaAnterior;
+        }
+    }
+
     private void iniciarProcesamientoAutomatico() {
         procesadorAutomatico = new Timeline(new KeyFrame(Duration.seconds(1), evento -> {
-            int pendientesAntes = controlador.getCantidadOperacionesProgramadasPendientes();
-            int notificacionesAntes = controlador.getCantidadNotificacionesPendientes();
-            controlador.notificarOperacionesProximas(java.time.LocalDateTime.now());
-            int ejecutadas = controlador.procesarOperacionesProgramadas();
-            int pendientesDespues = controlador.getCantidadOperacionesProgramadasPendientes();
-            int notificacionesDespues = controlador.getCantidadNotificacionesPendientes();
-
-            if (ejecutadas > 0 || pendientesAntes != pendientesDespues
-                    || notificacionesAntes != notificacionesDespues) {
-                refrescarTodo();
+            int nuevasAlertas = contexto.getSistema().notificarOperacionesProximas(java.time.LocalDateTime.now());
+            int ejecutadas = contexto.getSistema().procesarOperacionesProgramadas();
+            if (nuevasAlertas > 0 || ejecutadas > 0) {
+                try {
+                    contexto.guardar();
+                } catch (IOException ex) {
+                    System.err.println("No se pudo guardar el procesamiento automático: " + ex.getMessage());
+                }
             }
         }));
         procesadorAutomatico.setCycleCount(Timeline.INDEFINITE);
@@ -81,26 +85,12 @@ public class App extends Application {
 
     @Override
     public void stop() {
-        if (procesadorAutomatico != null) {
-            procesadorAutomatico.stop();
-        }
-    }
-
-    private void cargarDatosDeEjemplo() {
-        if (DatosDemo.cargar(controlador)) {
-            refrescarTodo();
-            Util.mostrar(Alert.AlertType.INFORMATION, "Datos de ejemplo",
-                    "Se cargaron 4 usuarios, 7 billeteras, transferencias y operaciones programadas.");
-        } else {
-            Util.mostrar(Alert.AlertType.INFORMATION, "Datos de ejemplo",
-                    "Los datos de ejemplo ya estaban cargados.");
-        }
-    }
-
-    private void refrescarTodo() {
-        for (Tab pestana : pestanas.getTabs()) {
-            if (pestana.getContent() instanceof Refrescable) {
-                ((Refrescable) pestana.getContent()).refrescar();
+        if (procesadorAutomatico != null) procesadorAutomatico.stop();
+        if (contexto != null) {
+            try {
+                contexto.guardar();
+            } catch (IOException ex) {
+                System.err.println("No se pudo guardar el estado al cerrar: " + ex.getMessage());
             }
         }
     }

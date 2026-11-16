@@ -20,6 +20,7 @@ public class CanjeBeneficio {
     private final String descripcionBeneficio;
     private final LocalDateTime fechaHora;
     private final int puntosGastados;
+    private final int valorBono;
     private String estado;
     private LocalDateTime fechaUso;
 
@@ -40,6 +41,7 @@ public class CanjeBeneficio {
         this.descripcionBeneficio = beneficio.getDescripcion();
         this.fechaHora = fechaHora;
         this.puntosGastados = puntosGastados;
+        this.valorBono = beneficio.getValorBono();
         this.estado = DISPONIBLE;
     }
 
@@ -52,6 +54,7 @@ public class CanjeBeneficio {
         this.descripcionBeneficio = original.descripcionBeneficio;
         this.fechaHora = original.fechaHora;
         this.puntosGastados = original.puntosGastados;
+        this.valorBono = original.valorBono;
         this.estado = original.estado;
         this.fechaUso = original.fechaUso;
     }
@@ -59,6 +62,28 @@ public class CanjeBeneficio {
     /** Copia defensiva que conserva el estado del comprobante. */
     public CanjeBeneficio copia() {
         return new CanjeBeneficio(this);
+    }
+
+    /** Reconstruye un cupón desde un respaldo persistido. */
+    public static CanjeBeneficio restaurar(String id, String codigoRedencion, String idUsuario,
+                                            String idBeneficio, String nombreBeneficio,
+                                            String descripcionBeneficio, LocalDateTime fechaHora,
+                                            int puntosGastados, int valorBono, String estado,
+                                            LocalDateTime fechaUso) {
+        Beneficio beneficio = new Beneficio(idBeneficio, nombreBeneficio, descripcionBeneficio,
+                puntosGastados, valorBono);
+        CanjeBeneficio canje = new CanjeBeneficio(id, idUsuario, beneficio, fechaHora, puntosGastados);
+        if (codigoRedencion != null && !codigoRedencion.isBlank()
+                && !canje.codigoRedencion.equals(codigoRedencion)) {
+            throw new IllegalArgumentException("El código de redención del respaldo no coincide.");
+        }
+        if (UTILIZADO.equals(estado)) {
+            canje.estado = UTILIZADO;
+            canje.fechaUso = fechaUso == null ? fechaHora : fechaUso;
+        } else if (!DISPONIBLE.equals(estado)) {
+            throw new IllegalArgumentException("Estado de cupón desconocido: " + estado);
+        }
+        return canje;
     }
 
     private static boolean textoVacio(String texto) {
@@ -81,6 +106,7 @@ public class CanjeBeneficio {
     public String getDescripcionBeneficio() { return descripcionBeneficio; }
     public LocalDateTime getFechaHora() { return fechaHora; }
     public int getPuntosGastados() { return puntosGastados; }
+    public int getValorBono() { return valorBono; }
     public String getEstado() { return estado; }
     public LocalDateTime getFechaUso() { return fechaUso; }
     public boolean isDisponible() { return DISPONIBLE.equals(estado); }

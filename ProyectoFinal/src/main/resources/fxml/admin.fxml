@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="co.edu.uniquindio.proyectofinal.Presentacion.Controladores.AdminViewController"
+            styleClass="app-page">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="18" styleClass="topbar">
+            <VBox spacing="2"><Label text="NEXO" styleClass="brand-small"/><Label text="ADMINISTRACIÓN" styleClass="eyebrow"/></VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="Acceso total · Administrador" styleClass="muted-label"/>
+            <Button text="Guardar ahora" onAction="#guardarAhora" styleClass="outline-button"/>
+            <Button text="Cerrar sesión" onAction="#cerrarSesion" styleClass="ghost-button"/>
+        </HBox>
+    </top>
+    <center>
+        <TabPane fx:id="tabsAdmin" tabClosingPolicy="UNAVAILABLE" styleClass="main-tabs">
+            <tabs>
+                <Tab text="Resumen">
+                    <VBox spacing="18" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Panel de administración" styleClass="page-title"/><Label text="Visión general de la operación y sus estructuras." styleClass="muted-label"/></VBox>
+                        <GridPane hgap="14" vgap="14">
+                            <columnConstraints><ColumnConstraints percentWidth="25"/><ColumnConstraints percentWidth="25"/><ColumnConstraints percentWidth="25"/><ColumnConstraints percentWidth="25"/></columnConstraints>
+                            <VBox GridPane.columnIndex="0" styleClass="metric-card"><Label text="USUARIOS" styleClass="eyebrow"/><Label fx:id="lblTotalUsuarios" text="0" styleClass="metric-value"/></VBox>
+                            <VBox GridPane.columnIndex="1" styleClass="metric-card"><Label text="BILLETERAS" styleClass="eyebrow"/><Label fx:id="lblTotalBilleteras" text="0" styleClass="metric-value"/></VBox>
+                            <VBox GridPane.columnIndex="2" styleClass="metric-card"><Label text="TRANSACCIONES" styleClass="eyebrow"/><Label fx:id="lblTotalTransacciones" text="0" styleClass="metric-value"/></VBox>
+                            <VBox GridPane.columnIndex="3" styleClass="metric-card"><Label text="SALDO ADMINISTRADO" styleClass="eyebrow"/><Label fx:id="lblSaldoGlobal" text="$ 0" styleClass="metric-value"/></VBox>
+                        </GridPane>
+                        <HBox spacing="14" VBox.vgrow="ALWAYS">
+                            <VBox spacing="10" HBox.hgrow="ALWAYS" styleClass="surface-card"><Label text="Actividad reciente" styleClass="section-title"/><TableView fx:id="tablaUltimasTransacciones" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colUltimaFecha" text="Fecha"/><TableColumn fx:id="colUltimoTipo" text="Tipo"/><TableColumn fx:id="colUltimoMonto" text="Valor"/><TableColumn fx:id="colUltimoEstado" text="Estado"/></columns></TableView></VBox>
+                            <VBox spacing="10" prefWidth="330" styleClass="surface-card"><Label text="Uso de estructuras" styleClass="section-title"/><Label text="Tabla hash" styleClass="structure-label"/><Label text="Acceso por identificación y código de billetera." styleClass="muted-label" wrapText="true"/><Label text="Árbol AVL" styleClass="structure-label"/><Label text="Usuarios ordenados por puntos y consultas por rango." styleClass="muted-label" wrapText="true"/><Label text="Cola de prioridad" styleClass="structure-label"/><Label text="Operaciones futuras organizadas por fecha y hora." styleClass="muted-label" wrapText="true"/><Label text="Pila y cola" styleClass="structure-label"/><Label text="Reversiones LIFO y notificaciones FIFO." styleClass="muted-label" wrapText="true"/><Label text="Grafo" styleClass="structure-label"/><Label text="Relaciones entre usuarios por transferencias." styleClass="muted-label" wrapText="true"/></VBox>
+                        </HBox>
+                    </VBox>
+                </Tab>
+                <Tab text="Usuarios">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Usuarios" styleClass="page-title"/><Label text="Administración de cuentas e identificaciones." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtUsuarioId" promptText="Cédula / ID"/><TextField fx:id="txtUsuarioNombre" promptText="Nombre completo"/><TextField fx:id="txtUsuarioCorreo" promptText="Correo electrónico"/><Button text="Crear" onAction="#crearUsuario" styleClass="primary-button"/><Button text="Guardar cambios" onAction="#modificarUsuario" styleClass="secondary-button"/><Button text="Dar de baja" onAction="#eliminarUsuario" styleClass="danger-button"/></HBox>
+                        <TableView fx:id="tablaUsuarios" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colUsuarioId" text="Identificación"/><TableColumn fx:id="colUsuarioNombre" text="Nombre"/><TableColumn fx:id="colUsuarioCorreo" text="Correo"/><TableColumn fx:id="colUsuarioPuntos" text="Puntos"/><TableColumn fx:id="colUsuarioNivel" text="Nivel"/><TableColumn fx:id="colUsuarioActivo" text="Estado"/></columns></TableView>
+                    </VBox>
+                </Tab>
+                <Tab text="Billeteras">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Billeteras digitales" styleClass="page-title"/><Label text="Crea cuentas, edita sus datos y habilita o suspende su operación." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtBilleteraUsuario" promptText="ID del propietario"/><TextField fx:id="txtBilleteraCodigo" promptText="Código numérico"/><TextField fx:id="txtBilleteraNombre" promptText="Nombre de la billetera"/><ChoiceBox fx:id="cmbBilleteraTipo" prefWidth="160"/><TextField fx:id="txtBilleteraSaldo" promptText="Saldo inicial"/><Button text="Crear billetera" onAction="#crearBilletera" styleClass="primary-button"/><Button text="Activar / suspender" onAction="#cambiarEstadoBilletera" styleClass="secondary-button"/></HBox>
+                        <TableView fx:id="tablaBilleteras" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colBilleteraCodigo" text="Código"/><TableColumn fx:id="colBilleteraUsuario" text="Propietario"/><TableColumn fx:id="colBilleteraNombre" text="Nombre"/><TableColumn fx:id="colBilleteraTipo" text="Tipo"/><TableColumn fx:id="colBilleteraSaldo" text="Saldo"/><TableColumn fx:id="colBilleteraEstado" text="Estado"/></columns></TableView>
+                    </VBox>
+                </Tab>
+                <Tab text="Operaciones">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Operaciones financieras" styleClass="page-title"/><Label text="El administrador puede ejecutar operaciones en nombre de cualquier usuario." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtOperacionUsuario" promptText="ID del usuario actor"/><TextField fx:id="txtOperacionOrigen" promptText="Billetera origen"/><TextField fx:id="txtOperacionDestino" promptText="Billetera destino (si aplica)"/><TextField fx:id="txtOperacionMonto" promptText="Monto entero"/><Button text="Recargar" onAction="#recargarBilletera" styleClass="primary-button"/><Button text="Retirar" onAction="#retirarBilletera" styleClass="secondary-button"/><Button text="Transferir" onAction="#transferir" styleClass="secondary-button"/><Button text="Revertir última" onAction="#revertir" styleClass="danger-button"/></HBox>
+                        <TableView fx:id="tablaTransacciones" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colTxId" text="ID"/><TableColumn fx:id="colTxFecha" text="Fecha"/><TableColumn fx:id="colTxUsuario" text="Usuario"/><TableColumn fx:id="colTxTipo" text="Tipo"/><TableColumn fx:id="colTxMonto" text="Valor"/><TableColumn fx:id="colTxOrigen" text="Origen"/><TableColumn fx:id="colTxDestino" text="Destino"/><TableColumn fx:id="colTxRiesgo" text="Riesgo"/><TableColumn fx:id="colTxEstado" text="Estado"/></columns></TableView>
+                    </VBox>
+                </Tab>
+                <Tab text="Programadas">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Operaciones programadas" styleClass="page-title"/><Label text="La cola de prioridad procesa primero la fecha y hora más próxima." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtProgramadaId" promptText="ID de operación"/><TextField fx:id="txtProgramadaUsuario" promptText="ID del usuario"/><TextField fx:id="txtProgramadaOrigen" promptText="Billetera origen"/><TextField fx:id="txtProgramadaDestino" promptText="Billetera destino"/><TextField fx:id="txtProgramadaMonto" promptText="Monto"/><TextField fx:id="txtProgramadaFecha" promptText="AAAA-MM-DDTHH:MM"/><ChoiceBox fx:id="cmbProgramadaTipo" prefWidth="170"/><ChoiceBox fx:id="cmbFrecuencia" prefWidth="130"/><Button text="Programar" onAction="#programarOperacion" styleClass="primary-button"/></HBox>
+                        <TableView fx:id="tablaProgramadas" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colProgId" text="ID"/><TableColumn fx:id="colProgUsuario" text="Usuario"/><TableColumn fx:id="colProgFecha" text="Fecha de ejecución"/><TableColumn fx:id="colProgTipo" text="Tipo"/><TableColumn fx:id="colProgValor" text="Valor"/><TableColumn fx:id="colProgFrecuencia" text="Frecuencia"/><TableColumn fx:id="colProgEstado" text="Estado"/></columns></TableView>
+                    </VBox>
+                </Tab>
+                <Tab text="Recompensas">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Catálogo de recompensas" styleClass="page-title"/><Label text="Los puntos se convierten en cupones con un abono real al saldo de una billetera." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtBeneficioId" promptText="ID"/><TextField fx:id="txtBeneficioNombre" promptText="Nombre del cupón"/><TextField fx:id="txtBeneficioDescripcion" promptText="Descripción"/><TextField fx:id="txtBeneficioPuntos" promptText="Costo en puntos"/><TextField fx:id="txtBeneficioBono" promptText="Bono en pesos"/><Button text="Crear cupón" onAction="#crearBeneficio" styleClass="primary-button"/><Button text="Actualizar" onAction="#modificarBeneficio" styleClass="secondary-button"/><Button text="Activar / desactivar" onAction="#cambiarEstadoBeneficio" styleClass="secondary-button"/></HBox>
+                        <SplitPane dividerPositions="0.55" VBox.vgrow="ALWAYS"><TableView fx:id="tablaBeneficios"><columns><TableColumn fx:id="colBenId" text="Código"/><TableColumn fx:id="colBenNombre" text="Beneficio"/><TableColumn fx:id="colBenPuntos" text="Costo"/><TableColumn fx:id="colBenBono" text="Abono"/><TableColumn fx:id="colBenActivo" text="Estado"/></columns></TableView><TableView fx:id="tablaCanjes"><columns><TableColumn fx:id="colCanjeCodigo" text="Cupón"/><TableColumn fx:id="colCanjeUsuario" text="Usuario"/><TableColumn fx:id="colCanjeNombre" text="Recompensa"/><TableColumn fx:id="colCanjeEstado" text="Estado"/><TableColumn fx:id="colCanjeBono" text="Abono"/></columns></TableView></SplitPane>
+                    </VBox>
+                </Tab>
+                <Tab text="Analítica y auditoría">
+                    <VBox spacing="14" styleClass="page-content">
+                        <VBox spacing="4"><Label text="Analítica financiera y riesgo" styleClass="page-title"/><Label text="Informes calculados con listas, árbol de puntos y grafo de transferencias." styleClass="muted-label"/></VBox>
+                        <HBox spacing="10"><Button text="Actualizar indicadores" onAction="#actualizarAnalitica" styleClass="primary-button"/><Button text="Detectar ciclos" onAction="#detectarCiclos" styleClass="secondary-button"/><Button text="Exportar respaldo TSV" onAction="#exportarRespaldo" styleClass="outline-button"/></HBox>
+                        <SplitPane dividerPositions="0.50" VBox.vgrow="ALWAYS"><TextArea fx:id="txtAnalitica" editable="false" wrapText="true" promptText="Indicadores y rutas del sistema..."/><TableView fx:id="tablaAuditoria"><columns><TableColumn fx:id="colAudFecha" text="Fecha"/><TableColumn fx:id="colAudUsuario" text="Usuario"/><TableColumn fx:id="colAudTx" text="Transacción"/><TableColumn fx:id="colAudNivel" text="Riesgo"/><TableColumn fx:id="colAudMotivo" text="Motivo"/></columns></TableView></SplitPane>
+                        <Label fx:id="lblRutaRespaldo" text="Los datos se guardan automáticamente al cerrar la aplicación." styleClass="muted-label" wrapText="true"/>
+                    </VBox>
+                </Tab>
+                <Tab text="Alertas">
+                    <VBox spacing="14" styleClass="page-content"><VBox spacing="4"><Label text="Centro de alertas" styleClass="page-title"/><Label text="Notificaciones recientes de todos los usuarios." styleClass="muted-label"/></VBox><TableView fx:id="tablaAlertas" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colAlertaFecha" text="Fecha"/><TableColumn fx:id="colAlertaUsuario" text="Usuario"/><TableColumn fx:id="colAlertaTipo" text="Tipo"/><TableColumn fx:id="colAlertaMensaje" text="Mensaje"/><TableColumn fx:id="colAlertaAtendida" text="Estado"/></columns></TableView><Button text="Despachar siguiente notificación (FIFO)" onAction="#despacharNotificacion" styleClass="secondary-button"/></VBox>
+                </Tab>
+                <Tab text="Datos">
+                    <VBox spacing="14" styleClass="page-content"><VBox spacing="4"><Label text="Persistencia y respaldos" styleClass="page-title"/><Label text="El estado se restaura automáticamente al iniciar y se guarda en el almacenamiento local." styleClass="muted-label"/></VBox><VBox spacing="12" styleClass="surface-card"><Label text="Archivo de datos" styleClass="section-title"/><Label fx:id="lblArchivoDatos" text="" styleClass="mono-label" wrapText="true"/><HBox spacing="10"><Button text="Guardar ahora" onAction="#guardarAhora" styleClass="primary-button"/><Button text="Recargar último respaldo" onAction="#recargarRespaldo" styleClass="secondary-button"/></HBox><Label text="El monitor de pruebas trabaja con instancias independientes y no modifica este archivo." styleClass="muted-label" wrapText="true"/></VBox></VBox>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+</BorderPane>

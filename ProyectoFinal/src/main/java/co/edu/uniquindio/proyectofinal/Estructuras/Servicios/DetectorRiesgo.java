@@ -68,6 +68,9 @@ public class DetectorRiesgo {
         private long totalOperaciones = 0;
         private final long[] operacionesPorHora = new long[24];
 
+        private Integer ultimoDestino = null;
+        private LocalDateTime ultimoEnvioDestino = null;
+
         // Buffer circular con las últimas operaciones.
         private final LocalDateTime[] tiempos = new LocalDateTime[VENTANA];
         private final int[] billeteras = new int[VENTANA];
@@ -215,10 +218,8 @@ public class DetectorRiesgo {
             perfiles.insertar(idUsuario, perfil);
         }
 
-        if (perfil.totalOperaciones < Long.MAX_VALUE) perfil.totalOperaciones++;
-        if (perfil.operacionesPorHora[ahora.getHour()] < Long.MAX_VALUE) {
-            perfil.operacionesPorHora[ahora.getHour()]++;
-        }
+        perfil.totalOperaciones++;
+        perfil.operacionesPorHora[ahora.getHour()]++;
 
         if (saliente) {
             perfil.sumaSalientes = perfil.sumaSalientes > Long.MAX_VALUE - monto
@@ -227,6 +228,10 @@ public class DetectorRiesgo {
                 perfil.cantidadSalientes++;
             }
 
+            if (codigoDestino != null) {
+                perfil.ultimoDestino = codigoDestino;
+                perfil.ultimoEnvioDestino = ahora;
+            }
         }
 
         perfil.tiempos[perfil.posicion] = ahora;
@@ -245,10 +250,7 @@ public class DetectorRiesgo {
                 || evaluacion == null || fecha == null) {
             throw new IllegalArgumentException("Los datos del evento de auditoría son obligatorios.");
         }
-        if (evaluacion.getNivel() == NivelRiesgo.BAJO) {
-            throw new IllegalArgumentException("Solo se auditan eventos con riesgo MEDIO o ALTO.");
-        }
-        contadorEventos = Math.incrementExact(contadorEventos);
+        contadorEventos++;
 
         EventoAuditoria evento = new EventoAuditoria(
                 contadorEventos, fecha, idUsuario, idTransaccion,
@@ -257,6 +259,13 @@ public class DetectorRiesgo {
 
         historialAuditoria.addLast(evento);
         return evento;
+    }
+
+    /** Incorpora un evento existente al reconstruir un respaldo persistido. */
+    public void restaurarEvento(EventoAuditoria evento) {
+        if (evento == null) throw new IllegalArgumentException("El evento no puede ser null.");
+        historialAuditoria.addLast(evento);
+        contadorEventos = Math.max(contadorEventos, evento.getId());
     }
 
     /** @return todos los eventos de auditoría en orden cronológico. */

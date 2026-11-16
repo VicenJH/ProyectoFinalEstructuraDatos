@@ -3,11 +3,11 @@ module co.edu.uniquindio.proyectofinal {
     requires javafx.fxml;
 
     opens co.edu.uniquindio.proyectofinal to javafx.fxml;
-    opens co.edu.uniquindio.proyectofinal.vistas to javafx.fxml;
+    opens co.edu.uniquindio.proyectofinal.Presentacion.Controladores to javafx.fxml;
     opens co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos to javafx.base;
 
     exports co.edu.uniquindio.proyectofinal;
-    exports co.edu.uniquindio.proyectofinal.vistas;
+    exports co.edu.uniquindio.proyectofinal.Presentacion;
     exports co.edu.uniquindio.proyectofinal.Estructuras.Arbol;
     exports co.edu.uniquindio.proyectofinal.Estructuras.Colas;
     exports co.edu.uniquindio.proyectofinal.Estructuras.Controllers;
@@ -16,5 +16,7 @@ module co.edu.uniquindio.proyectofinal {
     exports co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos;
     exports co.edu.uniquindio.proyectofinal.Estructuras.Pilas;
     exports co.edu.uniquindio.proyectofinal.Estructuras.Servicios;
+    exports co.edu.uniquindio.proyectofinal.Estructuras.Persistencia;
+    exports co.edu.uniquindio.proyectofinal.pruebas;
     exports co.edu.uniquindio.proyectofinal.Estructuras.SimpleList;
 }

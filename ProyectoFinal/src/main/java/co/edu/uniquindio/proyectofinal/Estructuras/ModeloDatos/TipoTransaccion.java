@@ -22,5 +22,8 @@ public enum TipoTransaccion {
     TRANSFERENCIA_INTERNA,
 
     /** Transferencia hacia una entidad o destino externo. */
-    TRANSFERENCIA_EXTERNA
+    TRANSFERENCIA_EXTERNA,
+
+    /** Abono promocional aplicado mediante un cupón de recompensa. */
+    BONIFICACION
 }

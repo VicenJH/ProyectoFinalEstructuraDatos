@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="co.edu.uniquindio.proyectofinal.Presentacion.Controladores.UserViewController"
+            styleClass="app-page">
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="18" styleClass="topbar">
+            <VBox spacing="2"><Label text="NEXO" styleClass="brand-small"/><Label text="MI BILLETERA" styleClass="eyebrow"/></VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <VBox alignment="CENTER_RIGHT" spacing="2"><Label fx:id="lblNombreUsuario" text="Hola" styleClass="topbar-name"/><Label fx:id="lblIdentificacion" text="" styleClass="muted-label"/></VBox>
+            <Button text="Cerrar sesión" onAction="#cerrarSesion" styleClass="ghost-button"/>
+        </HBox>
+    </top>
+    <center>
+        <VBox spacing="16" styleClass="page-content">
+            <HBox spacing="14" alignment="CENTER_LEFT">
+                <VBox spacing="5" styleClass="balance-card" HBox.hgrow="ALWAYS"><Label text="SALDO EN TUS BILLETERAS" styleClass="eyebrow-light"/><Label fx:id="lblSaldoTotal" text="$ 0" styleClass="balance-value"/><Label text="Tu dinero organizado en un solo lugar" styleClass="balance-caption"/></VBox>
+                <VBox spacing="6" styleClass="metric-card" prefWidth="190"><Label text="PUNTOS" styleClass="eyebrow"/><Label fx:id="lblPuntos" text="0" styleClass="metric-value"/><Label text="Recompensas acumuladas" styleClass="muted-label"/></VBox>
+                <VBox spacing="6" styleClass="metric-card" prefWidth="190"><Label text="NIVEL" styleClass="eyebrow"/><Label fx:id="lblNivel" text="Bronce" styleClass="metric-value"/><Label text="Por tu actividad" styleClass="muted-label"/></VBox>
+            </HBox>
+            <TabPane fx:id="tabsUsuario" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS" styleClass="main-tabs">
+                <tabs>
+                    <Tab text="Mis billeteras">
+                        <VBox spacing="14" styleClass="tab-content">
+                            <VBox spacing="4"><Label text="Tus espacios de dinero" styleClass="page-title"/><Label text="Cada billetera tiene su propio saldo e historial." styleClass="muted-label"/></VBox>
+                            <HBox spacing="10" styleClass="form-row"><TextField fx:id="txtNuevaWalletCodigo" promptText="Código numérico"/><TextField fx:id="txtNuevaWalletNombre" promptText="Nombre"/><ChoiceBox fx:id="cmbNuevaWalletTipo" prefWidth="180"/><Button text="Crear billetera" onAction="#crearBilletera" styleClass="primary-button"/></HBox>
+                            <TableView fx:id="tablaBilleteras" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colWalletCodigo" text="Código"/><TableColumn fx:id="colWalletNombre" text="Nombre"/><TableColumn fx:id="colWalletTipo" text="Categoría"/><TableColumn fx:id="colWalletSaldo" text="Saldo disponible"/><TableColumn fx:id="colWalletEstado" text="Estado"/></columns></TableView>
+                            <VBox spacing="10" styleClass="surface-card"><Label text="Mover dinero" styleClass="section-title"/><HBox spacing="10"><ComboBox fx:id="cmbOrigen" promptText="Mi billetera de origen" prefWidth="230"/><TextField fx:id="txtMonto" promptText="Monto en pesos"/><TextField fx:id="txtDestino" promptText="Código de billetera destino"/><Button text="Transferir" onAction="#transferir" styleClass="primary-button"/></HBox><HBox spacing="10"><Button text="Recargar billetera seleccionada" onAction="#recargar" styleClass="secondary-button"/><Button text="Retirar de billetera seleccionada" onAction="#retirar" styleClass="outline-button"/></HBox><Label text="Las transferencias internas entre usuarios de la plataforma no tienen comisión en esta simulación." styleClass="muted-label" wrapText="true"/></VBox>
+                        </VBox>
+                    </Tab>
+                    <Tab text="Movimientos">
+                        <VBox spacing="14" styleClass="tab-content"><VBox spacing="4"><Label text="Tu actividad" styleClass="page-title"/><Label text="Solo se muestran tus propios movimientos." styleClass="muted-label"/></VBox><TableView fx:id="tablaTransacciones" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colTxFecha" text="Fecha"/><TableColumn fx:id="colTxTipo" text="Tipo"/><TableColumn fx:id="colTxValor" text="Valor"/><TableColumn fx:id="colTxOrigen" text="Origen"/><TableColumn fx:id="colTxDestino" text="Destino"/><TableColumn fx:id="colTxPuntos" text="Puntos"/><TableColumn fx:id="colTxEstado" text="Estado"/></columns></TableView></VBox>
+                    </Tab>
+                    <Tab text="Programar">
+                        <VBox spacing="14" styleClass="tab-content"><VBox spacing="4"><Label text="Movimientos automáticos" styleClass="page-title"/><Label text="Programa recargas, retiros o transferencias para una fecha futura." styleClass="muted-label"/></VBox><HBox spacing="10" styleClass="form-row"><TextField fx:id="txtProgramadaId" promptText="Identificador"/><ComboBox fx:id="cmbWalletProgramada" promptText="Mi billetera origen" prefWidth="210"/><TextField fx:id="txtProgramadaDestino" promptText="Destino (transferencia)"/><TextField fx:id="txtProgramadaMonto" promptText="Monto"/><TextField fx:id="txtProgramadaFecha" promptText="AAAA-MM-DDTHH:MM"/><ChoiceBox fx:id="cmbProgramadaTipo" prefWidth="170"/><ChoiceBox fx:id="cmbProgramadaFrecuencia" prefWidth="130"/><Button text="Programar" onAction="#programarOperacion" styleClass="primary-button"/></HBox><TableView fx:id="tablaProgramadas" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colProgFecha" text="Fecha"/><TableColumn fx:id="colProgId" text="ID"/><TableColumn fx:id="colProgTipo" text="Tipo"/><TableColumn fx:id="colProgMonto" text="Monto"/><TableColumn fx:id="colProgFrecuencia" text="Frecuencia"/><TableColumn fx:id="colProgEstado" text="Estado"/></columns></TableView></VBox>
+                    </Tab>
+                    <Tab text="Recompensas">
+                        <VBox spacing="14" styleClass="tab-content"><VBox spacing="4"><Label text="Puntos y cupones" styleClass="page-title"/><Label text="Canjea puntos por bonos y aplica el código a una de tus billeteras." styleClass="muted-label"/></VBox><SplitPane dividerPositions="0.58" VBox.vgrow="ALWAYS"><VBox spacing="8"><Label text="Catálogo" styleClass="section-title"/><TableView fx:id="tablaBeneficios" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colBenNombre" text="Recompensa"/><TableColumn fx:id="colBenPuntos" text="Puntos"/><TableColumn fx:id="colBenBono" text="Abono"/></columns></TableView><Button text="Canjear beneficio seleccionado" onAction="#canjearBeneficio" styleClass="primary-button"/></VBox><VBox spacing="8"><Label text="Tus cupones" styleClass="section-title"/><TableView fx:id="tablaCanjes" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colCanjeCodigo" text="Código"/><TableColumn fx:id="colCanjeNombre" text="Beneficio"/><TableColumn fx:id="colCanjeEstado" text="Estado"/><TableColumn fx:id="colCanjeBono" text="Abono"/></columns></TableView><HBox spacing="8"><TextField fx:id="txtCodigoCupon" promptText="Código RED-CANJE..." HBox.hgrow="ALWAYS"/><Button text="Aplicar cupón" onAction="#aplicarCupon" styleClass="secondary-button"/></HBox></VBox></SplitPane></VBox>
+                    </Tab>
+                    <Tab text="Mi información">
+                        <VBox spacing="14" styleClass="tab-content"><VBox spacing="4"><Label text="Mi perfil y notificaciones" styleClass="page-title"/><Label text="Consulta tu información, alertas y actividad de seguridad." styleClass="muted-label"/></VBox><GridPane hgap="14" vgap="12" styleClass="surface-card"><Label text="Nombre" GridPane.rowIndex="0" styleClass="field-label"/><Label fx:id="lblPerfilNombre" text="" GridPane.columnIndex="1" GridPane.rowIndex="0"/><Label text="Identificación" GridPane.rowIndex="1" styleClass="field-label"/><Label fx:id="lblPerfilId" text="" GridPane.columnIndex="1" GridPane.rowIndex="1"/><Label text="Correo" GridPane.rowIndex="2" styleClass="field-label"/><Label fx:id="lblPerfilCorreo" text="" GridPane.columnIndex="1" GridPane.rowIndex="2"/></GridPane><Label text="Alertas recientes" styleClass="section-title"/><TableView fx:id="tablaAlertas" VBox.vgrow="ALWAYS"><columns><TableColumn fx:id="colAlertaFecha" text="Fecha"/><TableColumn fx:id="colAlertaTipo" text="Tipo"/><TableColumn fx:id="colAlertaMensaje" text="Mensaje"/><TableColumn fx:id="colAlertaAtendida" text="Atendida"/></columns></TableView></VBox>
+                    </Tab>
+                </tabs>
+            </TabPane>
+        </VBox>
+    </center>
+</BorderPane>
