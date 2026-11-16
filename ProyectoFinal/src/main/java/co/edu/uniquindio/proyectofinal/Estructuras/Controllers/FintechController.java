@@ -303,7 +303,7 @@ public class FintechController {
         }
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, false, false, codigo, null, LocalDateTime.now());
+                usuario.getId(), monto, false, codigo, null, LocalDateTime.now());
 
         billetera.recargar(monto);
 
@@ -332,7 +332,7 @@ public class FintechController {
         }
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, true, false, codigo, null, LocalDateTime.now());
+                usuario.getId(), monto, true, codigo, null, LocalDateTime.now());
 
         billetera.retirar(monto);
 
@@ -362,7 +362,7 @@ public class FintechController {
         if (!destino.puedeRecargar(monto)) return rechazar(usuario, "La billetera destino no puede recibir ese monto.");
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, true, true, codOrigen, codDestino, LocalDateTime.now());
+                usuario.getId(), monto, true, codOrigen, codDestino, LocalDateTime.now());
 
         // Las dos modificaciones están protegidas por las validaciones previas.
         origen.retirar(monto);
@@ -417,10 +417,8 @@ public class FintechController {
 
         pilaReversiones.push(tx);
 
-        boolean esTransferencia = tipo == TipoTransaccion.TRANSFERENCIA_INTERNA
-                || tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA;
         detectorRiesgo.registrarOperacion(
-                actor.getId(), monto, tipo != TipoTransaccion.RECARGA, esTransferencia, origen.getCodigo(),
+                actor.getId(), monto, tipo != TipoTransaccion.RECARGA, origen.getCodigo(),
                 destino == null ? null : destino.getCodigo(), fechaOperacion);
 
         if (riesgo.getNivel() != NivelRiesgo.BAJO) {
@@ -591,8 +589,7 @@ public class FintechController {
         if (id == null || id.trim().isEmpty() || existeIdOperacionProgramada(id.trim())
                 || origen == null || !origen.isActivo()
                 || tipo == null || fechaHora == null || frecuencia == null
-                || convertirMonto(valor) == null
-                || estado == null || !"PENDIENTE".equalsIgnoreCase(estado.trim())) {
+                || convertirMonto(valor) == null) {
             return false;
         }
         Usuario usuarioOrigen = buscarUsuario(origen.getIdUsuario());
@@ -602,23 +599,15 @@ public class FintechController {
                 || tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA;
         if (esTransferencia) {
             Billetera destino = billeterasPorCodigo.buscar(codDestino);
-            if (destino == null || !destino.isActivo() || codOrigen == codDestino) return false;
-
-            Usuario usuarioDestino = buscarUsuario(destino.getIdUsuario());
-            if (usuarioDestino == null) return false;
-
-            boolean esTransferenciaExterna = !usuarioOrigen.getId().equals(usuarioDestino.getId());
-            if ((tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA) != esTransferenciaExterna) {
-                // Evita que una programación declarada interna termine siendo externa, o viceversa.
-                return false;
-            }
+            if (destino == null || !destino.isActivo() || codOrigen == codDestino
+                    || buscarUsuario(destino.getIdUsuario()) == null) return false;
         }
 
         try {
             operacionesProgramadas.encolar(new OperacionProgramada(
                     id.trim(), valor,
                     String.valueOf(codOrigen), esTransferencia ? String.valueOf(codDestino) : null,
-                    fechaHora, tipo, frecuencia, "PENDIENTE",
+                    fechaHora, tipo, frecuencia, estado,
                     origen.getIdUsuario()
             ));
         } catch (IllegalArgumentException e) {
@@ -774,12 +763,14 @@ public class FintechController {
     // BENEFICIOS Y CANJES DE PUNTOS
     // ------------------------------------------------------------------
 
-    /** Registra un beneficio disponible en el catálogo. */
+    /** Registra un beneficio nuevo. Los identificadores se guardan en mayúscula. */
     public boolean registrarBeneficio(String id, String nombre, String descripcion, int costoPuntos) {
-        if (id == null || id.trim().isEmpty() || beneficiosPorId.buscar(id.trim()) != null) return false;
+        if (id == null || id.trim().isEmpty()) return false;
+        String idNormalizado = id.trim().toUpperCase();
+        if (beneficiosPorId.buscar(idNormalizado) != null) return false;
         try {
-            Beneficio beneficio = new Beneficio(id, nombre, descripcion, costoPuntos);
-            beneficiosPorId.insertar(beneficio.getId(), beneficio);
+            Beneficio beneficio = new Beneficio(idNormalizado, nombre, descripcion, costoPuntos);
+            beneficiosPorId.insertar(idNormalizado, beneficio);
             catalogoBeneficios.addLast(beneficio);
             return true;
         } catch (IllegalArgumentException ex) {
@@ -787,65 +778,149 @@ public class FintechController {
         }
     }
 
-    public Beneficio buscarBeneficio(String id) {
-        return id == null ? null : beneficiosPorId.buscar(id.trim());
+    /** Busca por identificador sin distinguir mayúsculas ni espacios exteriores. */
+    private Beneficio buscarBeneficioInterno(String id) {
+        return id == null ? null : beneficiosPorId.buscar(id.trim().toUpperCase());
     }
 
-    /** Devuelve el catálogo disponible sin exponer la lista interna. */
+    /** Devuelve una copia del beneficio para impedir modificaciones externas al catálogo. */
+    public Beneficio buscarBeneficio(String id) {
+        Beneficio beneficio = buscarBeneficioInterno(id);
+        return beneficio == null ? null : beneficio.copia();
+    }
+
+    /** Modifica la información de catálogo; los canjes anteriores conservan su fotografía histórica. */
+    public boolean modificarBeneficio(String id, String nombre, String descripcion, int costoPuntos) {
+        Beneficio beneficio = buscarBeneficioInterno(id);
+        if (beneficio == null) return false;
+        try {
+            beneficio.actualizarDatos(nombre, descripcion, costoPuntos);
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    /** Devuelve una copia del catálogo completo, incluidos los beneficios inactivos. */
+    public SimpleLinkedList<Beneficio> obtenerCatalogoBeneficios() {
+        SimpleLinkedList<Beneficio> copia = new SimpleLinkedList<>();
+        for (Beneficio beneficio : catalogoBeneficios) copia.addLast(beneficio.copia());
+        return copia;
+    }
+
+    /** Devuelve únicamente los beneficios que pueden canjearse actualmente. */
     public SimpleLinkedList<Beneficio> obtenerBeneficiosDisponibles() {
         SimpleLinkedList<Beneficio> resultado = new SimpleLinkedList<>();
         for (Beneficio beneficio : catalogoBeneficios) {
-            if (beneficio.isActivo()) resultado.addLast(beneficio);
+            if (beneficio.isActivo()) resultado.addLast(beneficio.copia());
         }
         return resultado;
     }
 
+    /** Desactiva un beneficio para nuevos canjes, sin invalidar los ya entregados. */
     public boolean desactivarBeneficio(String id) {
-        Beneficio beneficio = buscarBeneficio(id);
+        Beneficio beneficio = buscarBeneficioInterno(id);
         if (beneficio == null || !beneficio.isActivo()) return false;
         beneficio.setActivo(false);
         return true;
     }
 
+    /** Reactiva un beneficio previamente desactivado. */
+    public boolean activarBeneficio(String id) {
+        Beneficio beneficio = buscarBeneficioInterno(id);
+        if (beneficio == null || beneficio.isActivo()) return false;
+        beneficio.setActivo(true);
+        return true;
+    }
+
     /**
-     * Canjea un beneficio si el usuario está activo y cuenta con suficientes puntos.
-     * Los puntos se descuentan sincronizando el árbol de clasificación.
+     * Canjea un beneficio. Primero valida y construye el comprobante; solo después
+     * descuenta los puntos y registra el canje, evitando cobros sin comprobante.
+     * Retorna null cuando el usuario, beneficio o saldo de puntos no son válidos.
      */
     public CanjeBeneficio canjearBeneficio(String idUsuario, String idBeneficio) {
         Usuario usuario = buscarUsuario(idUsuario);
-        Beneficio beneficio = buscarBeneficio(idBeneficio);
+        Beneficio beneficio = buscarBeneficioInterno(idBeneficio);
         if (usuario == null || beneficio == null || !beneficio.isActivo()) return null;
         if (usuario.getPuntosAcumulados() < beneficio.getCostoPuntos()) return null;
 
+        long siguiente = contadorCanjes + 1;
+        CanjeBeneficio canje;
+        try {
+            canje = new CanjeBeneficio(
+                    String.format("CANJE-%06d", siguiente), usuario.getId(), beneficio,
+                    LocalDateTime.now(), beneficio.getCostoPuntos());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+
         if (!quitarPuntos(usuario, beneficio.getCostoPuntos())) return null;
 
-        contadorCanjes++;
-        CanjeBeneficio canje = new CanjeBeneficio(
-                "CANJE-" + contadorCanjes,
-                usuario.getId(),
-                beneficio,
-                LocalDateTime.now(),
-                beneficio.getCostoPuntos()
-        );
-        usuario.getHistorialCanjes().addLast(canje);
+        contadorCanjes = siguiente;
+        usuario.registrarCanje(canje);
         historialCanjes.addLast(canje);
         generarAlertaParaUsuario(usuario,
                 "Canje realizado: " + beneficio.getNombre() + ". Se descontaron "
-                        + beneficio.getCostoPuntos() + " puntos.",
+                        + beneficio.getCostoPuntos() + " puntos. Código: " + canje.getCodigoRedencion(),
                 "CANJE_BENEFICIO");
-        return canje;
+        return canje.copia();
     }
 
+    /** Busca un canje por su identificador en el historial global. */
+    private CanjeBeneficio buscarCanjeBeneficioInterno(String idCanje) {
+        if (idCanje == null || idCanje.trim().isEmpty()) return null;
+        String idNormalizado = idCanje.trim();
+        for (CanjeBeneficio canje : historialCanjes) {
+            if (canje.getId().equalsIgnoreCase(idNormalizado)
+                    || canje.getCodigoRedencion().equalsIgnoreCase(idNormalizado)) return canje;
+        }
+        return null;
+    }
+
+    /** Devuelve una copia del comprobante para proteger el estado interno del canje. */
+    public CanjeBeneficio buscarCanjeBeneficio(String idCanje) {
+        CanjeBeneficio canje = buscarCanjeBeneficioInterno(idCanje);
+        return canje == null ? null : canje.copia();
+    }
+
+    /** Marca como utilizado un canje, comprobando que pertenezca al usuario indicado. */
+    public boolean utilizarCanjeBeneficio(String idUsuario, String idCanje) {
+        Usuario usuario = buscarUsuario(idUsuario);
+        CanjeBeneficio canje = buscarCanjeBeneficioInterno(idCanje);
+        if (usuario == null || canje == null || !usuario.getId().equals(canje.getIdUsuario())) return false;
+        boolean actualizado = canje.marcarComoUtilizado();
+        if (actualizado) {
+            generarAlertaParaUsuario(usuario,
+                    "Beneficio utilizado: " + canje.getNombreBeneficio()
+                            + " (" + canje.getCodigoRedencion() + ").",
+                    "BENEFICIO_UTILIZADO");
+        }
+        return actualizado;
+    }
+
+    /** Historial global de canjes, en orden de realización. */
     public SimpleLinkedList<CanjeBeneficio> obtenerHistorialCanjes() {
-        return copiarLista(historialCanjes);
+        SimpleLinkedList<CanjeBeneficio> copia = new SimpleLinkedList<>();
+        for (CanjeBeneficio canje : historialCanjes) copia.addLast(canje.copia());
+        return copia;
     }
 
+    /** Historial de un usuario; también permite consultar usuarios dados de baja. */
     public SimpleLinkedList<CanjeBeneficio> obtenerHistorialCanjesUsuario(String idUsuario) {
         SimpleLinkedList<CanjeBeneficio> resultado = new SimpleLinkedList<>();
         if (idUsuario == null) return resultado;
         Usuario usuario = usuariosPorId.buscar(idUsuario.trim());
         if (usuario == null) return resultado;
         for (CanjeBeneficio canje : usuario.getHistorialCanjes()) resultado.addLast(canje);
+        return resultado;
+    }
+
+    /** Canjes que el usuario todavía puede utilizar. */
+    public SimpleLinkedList<CanjeBeneficio> obtenerCanjesDisponiblesUsuario(String idUsuario) {
+        SimpleLinkedList<CanjeBeneficio> resultado = new SimpleLinkedList<>();
+        for (CanjeBeneficio canje : obtenerHistorialCanjesUsuario(idUsuario)) {
+            if (canje.isDisponible()) resultado.addLast(canje);
+        }
         return resultado;
     }
 
@@ -1080,8 +1155,8 @@ public class FintechController {
 
     /**
      * Exporta una instantánea textual del estado del sistema en formato TSV UTF-8.
-     * Cada fila tiene un tipo de registro y campos escapados con 	, 
- y \\.
+     * Cada fila tiene un tipo de registro y campos escapados con 	,
+     y \\.
      * No es un mecanismo de restauración automática; es un respaldo legible para
      * conservar los datos principales y permitir una restauración posterior.
      *
@@ -1117,7 +1192,9 @@ public class FintechController {
                 for (CanjeBeneficio canje : usuario.getHistorialCanjes()) {
                     escribirFilaRespaldo(writer, "CANJE_USUARIO", canje.getId(), usuario.getId(),
                             canje.getIdBeneficio(), canje.getNombreBeneficio(), canje.getFechaHora().toString(),
-                            String.valueOf(canje.getPuntosGastados()), canje.getEstado());
+                            String.valueOf(canje.getPuntosGastados()), canje.getEstado(),
+                            canje.getCodigoRedencion(),
+                            canje.getFechaUso() == null ? "" : canje.getFechaUso().toString());
                 }
             }
 
@@ -1147,7 +1224,9 @@ public class FintechController {
             for (CanjeBeneficio canje : historialCanjes) {
                 escribirFilaRespaldo(writer, "CANJE", canje.getId(), canje.getIdUsuario(),
                         canje.getIdBeneficio(), canje.getNombreBeneficio(), canje.getFechaHora().toString(),
-                        String.valueOf(canje.getPuntosGastados()), canje.getEstado());
+                        String.valueOf(canje.getPuntosGastados()), canje.getEstado(),
+                        canje.getCodigoRedencion(),
+                        canje.getFechaUso() == null ? "" : canje.getFechaUso().toString());
             }
 
             escribirFilaRespaldo(writer, "SECCION", "NOTIFICACIONES_PENDIENTES");

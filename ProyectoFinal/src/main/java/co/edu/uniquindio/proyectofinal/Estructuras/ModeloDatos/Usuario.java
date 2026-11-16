@@ -224,9 +224,19 @@ public class Usuario implements Comparable<Usuario> {
         return historialAlertas;
     }
 
-    /** @return historial de canjes realizados por el usuario. */
+    /** Registra un canje en el historial privado del usuario. */
+    public void registrarCanje(CanjeBeneficio canje) {
+        if (canje == null || !id.equals(canje.getIdUsuario())) {
+            throw new IllegalArgumentException("El canje no pertenece a este usuario.");
+        }
+        historialCanjes.addLast(canje);
+    }
+
+    /** @return copia del historial; evita que una vista modifique los registros internos. */
     public SimpleLinkedList<CanjeBeneficio> getHistorialCanjes() {
-        return historialCanjes;
+        SimpleLinkedList<CanjeBeneficio> copia = new SimpleLinkedList<>();
+        for (CanjeBeneficio canje : historialCanjes) copia.addLast(canje.copia());
+        return copia;
     }
 
     /** @return true cuando el usuario puede operar en la plataforma. */
