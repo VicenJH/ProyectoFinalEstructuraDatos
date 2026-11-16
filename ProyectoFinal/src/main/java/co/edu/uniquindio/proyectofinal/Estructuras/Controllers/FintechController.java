@@ -12,6 +12,7 @@ import co.edu.uniquindio.proyectofinal.Estructuras.Servicios.DetectorRiesgo;
 import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.SimpleLinkedList;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
  * Fachada del sistema Fintech. La interfaz gráfica solo debe llamar
@@ -139,6 +140,11 @@ public class FintechController {
     }
 
     public Usuario buscarUsuario(String id) {
+        Usuario usuario = buscarUsuarioInterno(id);
+        return usuario == null ? null : usuario.copia();
+    }
+
+    private Usuario buscarUsuarioInterno(String id) {
         if (id == null) return null;
         Usuario usuario = usuariosPorId.buscar(id.trim());
         return usuario != null && usuario.isActivo() ? usuario : null;
@@ -146,7 +152,7 @@ public class FintechController {
 
     /** Modifica nombre y correo de un usuario. No toca id ni puntos. */
     public boolean modificarUsuario(String id, String nombre, String correo) {
-        Usuario usuario = buscarUsuario(id);
+        Usuario usuario = buscarUsuarioInterno(id);
 
         if (usuario == null
                 || nombre == null || nombre.trim().isEmpty()
@@ -154,9 +160,12 @@ public class FintechController {
             return false;
         }
 
-        usuario.setNombre(nombre);
-        usuario.setCorreo(correo);
-        return true;
+        try {
+            usuario.actualizarDatos(nombre, correo);
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     /**
@@ -164,18 +173,16 @@ public class FintechController {
      * El vértice del grafo se conserva como registro histórico de transferencias.
      */
     public boolean eliminarUsuario(String id) {
-        Usuario usuario = buscarUsuario(id);
+        Usuario usuario = buscarUsuarioInterno(id);
         if (usuario == null) return false;
 
         // Baja lógica: preserva transacciones, billeteras y referencias para auditoría/reversiones.
         arbolUsuariosPorPuntos.eliminar(usuario);
         usuario.setActivo(false);
-        for (Billetera billetera : usuario.getBilleteras()) {
-            billetera.setActivo(false);
-        }
+        usuario.desactivarBilleteras();
         // listaUsuarios conserva el registro histórico para que la analítica
         // no pierda la actividad de usuarios dados de baja. El árbol de puntos
-        // y buscarUsuario() sí representan exclusivamente usuarios activos.
+        // y buscarUsuarioInterno() sí representan exclusivamente usuarios activos.
 
         // Una operación periódica de un usuario eliminado no debe reprogramarse indefinidamente.
         SimpleLinkedList<OperacionProgramada> pendientes = operacionesProgramadas.aListaOrdenada();
@@ -202,7 +209,7 @@ public class FintechController {
 
     public boolean crearBilleteraAUsuario(String idUsuario, int codigoBilletera, String nombre,
                                           TipoBilletera tipo, int saldoInicial) {
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
         if (usuario == null) {
             return false;
         }
@@ -219,30 +226,38 @@ public class FintechController {
             return false;
         }
 
-        usuario.getBilleteras().addLast(nuevaBilletera);
+        usuario.agregarBilletera(nuevaBilletera);
         billeterasPorCodigo.insertar(codigoBilletera, nuevaBilletera);
         return true;
     }
 
     public Billetera buscarBilletera(int codigo) {
-        return billeterasPorCodigo.buscar(codigo);
+        Billetera billetera = billeterasPorCodigo.buscar(codigo);
+        return billetera == null ? null : billetera.copia();
     }
 
     /** Modifica el nombre y la categoría de una billetera perteneciente al usuario. */
     public boolean modificarBilletera(String idUsuario, int codigo, String nombre, TipoBilletera tipo) {
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
         Billetera billetera = billeterasPorCodigo.buscar(codigo);
         if (usuario == null || billetera == null || !billetera.isActivo()
                 || !usuario.getId().equals(billetera.getIdUsuario())
                 || nombre == null || nombre.trim().isEmpty() || tipo == null) return false;
-        billetera.setNombre(nombre);
-        billetera.setTipo(tipo);
-        return true;
+        // Cambiar la categoría después de operar reescribiría retrospectivamente
+        // los informes históricos por categoría.
+        if (tipo != billetera.getTipo() && !billetera.getHistorialTransacciones().isEmpty()) return false;
+        try {
+            billetera.setNombre(nombre);
+            billetera.setTipo(tipo);
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     /** Cambia el estado de una billetera sin borrar su historial ni sus referencias. */
     public boolean cambiarEstadoBilletera(String idUsuario, int codigo, boolean activa) {
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
         Billetera billetera = billeterasPorCodigo.buscar(codigo);
         if (usuario == null || billetera == null
                 || !usuario.getId().equals(billetera.getIdUsuario())) return false;
@@ -283,86 +298,120 @@ public class FintechController {
     }
 
     private Transaccion ejecutarRecarga(int codigo, double montoBruto, String idUsuario, boolean programada) {
+        return ejecutarRecarga(codigo, montoBruto, idUsuario, programada, LocalDateTime.now());
+    }
+
+    private Transaccion ejecutarRecarga(int codigo, double montoBruto, String idUsuario,
+                                        boolean programada, LocalDateTime fechaOperacion) {
+        if (fechaOperacion == null) throw new IllegalArgumentException("La fecha de operación no puede ser null.");
         Billetera billetera = billeterasPorCodigo.buscar(codigo);
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
 
         if (usuario == null) return null;
         if (billetera == null || !usuario.getId().equals(billetera.getIdUsuario())) {
-            return rechazar(usuario, "La billetera de origen no existe o no pertenece al usuario.");
+            return rechazar(usuario, "La billetera de origen no existe o no pertenece al usuario.",
+                    codigo, null, montoBruto, TipoTransaccion.RECARGA, fechaOperacion);
         }
 
         Integer monto = convertirMonto(montoBruto);
         if (monto == null) {
-            return rechazar(usuario, "Monto inválido para la recarga.");
+            return rechazar(usuario, "Monto inválido para la recarga.",
+                    codigo, null, montoBruto, TipoTransaccion.RECARGA, fechaOperacion);
         }
         if (!billetera.isActivo()) {
-            return rechazar(usuario, "La billetera " + codigo + " está inactiva.");
+            return rechazar(usuario, "La billetera " + codigo + " está inactiva.",
+                    codigo, null, montoBruto, TipoTransaccion.RECARGA, fechaOperacion);
         }
         if (!billetera.puedeRecargar(monto)) {
-            return rechazar(usuario, "La recarga supera el saldo máximo permitido.");
+            return rechazar(usuario, "La recarga supera el saldo máximo permitido.",
+                    codigo, null, montoBruto, TipoTransaccion.RECARGA, fechaOperacion);
         }
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, false, codigo, null, LocalDateTime.now());
+                usuario.getId(), monto, false, codigo, null, fechaOperacion);
 
         billetera.recargar(monto);
 
         int puntos = monto / 100 + (programada ? BONO_PUNTOS_PROGRAMADA : 0);
-        return registrar(usuario, billetera, null, monto, TipoTransaccion.RECARGA, puntos, riesgo);
+        return registrar(usuario, billetera, null, monto, TipoTransaccion.RECARGA, puntos, riesgo, fechaOperacion);
     }
 
     private Transaccion ejecutarRetiro(int codigo, double montoBruto, String idUsuario, boolean programada) {
+        return ejecutarRetiro(codigo, montoBruto, idUsuario, programada, LocalDateTime.now());
+    }
+
+    private Transaccion ejecutarRetiro(int codigo, double montoBruto, String idUsuario,
+                                       boolean programada, LocalDateTime fechaOperacion) {
+        if (fechaOperacion == null) throw new IllegalArgumentException("La fecha de operación no puede ser null.");
         Billetera billetera = billeterasPorCodigo.buscar(codigo);
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
 
         if (usuario == null) return null;
         if (billetera == null || !usuario.getId().equals(billetera.getIdUsuario())) {
-            return rechazar(usuario, "La billetera de origen no existe o no pertenece al usuario.");
+            return rechazar(usuario, "La billetera de origen no existe o no pertenece al usuario.",
+                    codigo, null, montoBruto, TipoTransaccion.RETIRO, fechaOperacion);
         }
 
         Integer monto = convertirMonto(montoBruto);
         if (monto == null) {
-            return rechazar(usuario, "Monto inválido para el retiro.");
+            return rechazar(usuario, "Monto inválido para el retiro.",
+                    codigo, null, montoBruto, TipoTransaccion.RETIRO, fechaOperacion);
         }
         if (!billetera.isActivo()) {
-            return rechazar(usuario, "La billetera " + codigo + " está inactiva.");
+            return rechazar(usuario, "La billetera " + codigo + " está inactiva.",
+                    codigo, null, montoBruto, TipoTransaccion.RETIRO, fechaOperacion);
         }
         if (billetera.getSaldo() < monto) {
-            return rechazar(usuario, "Saldo insuficiente en la billetera " + codigo + ".");
+            return rechazar(usuario, "Saldo insuficiente en la billetera " + codigo + ".",
+                    codigo, null, montoBruto, TipoTransaccion.RETIRO, fechaOperacion);
         }
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, true, codigo, null, LocalDateTime.now());
+                usuario.getId(), monto, true, codigo, null, fechaOperacion);
 
         billetera.retirar(monto);
 
         int puntos = (monto / 100) * 2 + (programada ? BONO_PUNTOS_PROGRAMADA : 0);
-        return registrar(usuario, billetera, null, monto, TipoTransaccion.RETIRO, puntos, riesgo);
+        return registrar(usuario, billetera, null, monto, TipoTransaccion.RETIRO, puntos, riesgo, fechaOperacion);
     }
 
     private Transaccion ejecutarTransferencia(int codOrigen, int codDestino, double montoBruto,
                                               String idUsuario, boolean programada) {
+        return ejecutarTransferencia(codOrigen, codDestino, montoBruto, idUsuario,
+                programada, LocalDateTime.now());
+    }
+
+    private Transaccion ejecutarTransferencia(int codOrigen, int codDestino, double montoBruto,
+                                              String idUsuario, boolean programada, LocalDateTime fechaOperacion) {
+        if (fechaOperacion == null) throw new IllegalArgumentException("La fecha de operación no puede ser null.");
         Billetera origen = billeterasPorCodigo.buscar(codOrigen);
         Billetera destino = billeterasPorCodigo.buscar(codDestino);
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
 
         if (origen == null || destino == null || usuario == null
                 || !usuario.getId().equals(origen.getIdUsuario())) {
-            return usuario == null ? null : rechazar(usuario, "La billetera de origen o destino no existe.");
+            return usuario == null ? null : rechazar(usuario, "La billetera de origen o destino no existe.",
+                    codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
         }
 
         Integer monto = convertirMonto(montoBruto);
-        if (monto == null) return rechazar(usuario, "Monto inválido para la transferencia.");
-        if (codOrigen == codDestino) return rechazar(usuario, "La billetera de origen y destino no pueden ser la misma.");
-        if (!origen.isActivo() || !destino.isActivo()) return rechazar(usuario, "Alguna de las billeteras está inactiva.");
+        if (monto == null) return rechazar(usuario, "Monto inválido para la transferencia.",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
+        if (codOrigen == codDestino) return rechazar(usuario, "La billetera de origen y destino no pueden ser la misma.",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
+        if (!origen.isActivo() || !destino.isActivo()) return rechazar(usuario, "Alguna de las billeteras está inactiva.",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
 
-        Usuario propietarioDestino = buscarUsuario(destino.getIdUsuario());
-        if (propietarioDestino == null) return rechazar(usuario, "El usuario destino no está activo.");
-        if (origen.getSaldo() < monto) return rechazar(usuario, "Saldo insuficiente en la billetera " + codOrigen + ".");
-        if (!destino.puedeRecargar(monto)) return rechazar(usuario, "La billetera destino no puede recibir ese monto.");
+        Usuario propietarioDestino = buscarUsuarioInterno(destino.getIdUsuario());
+        if (propietarioDestino == null) return rechazar(usuario, "El usuario destino no está activo.",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
+        if (origen.getSaldo() < monto) return rechazar(usuario, "Saldo insuficiente en la billetera " + codOrigen + ".",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
+        if (!destino.puedeRecargar(monto)) return rechazar(usuario, "La billetera destino no puede recibir ese monto.",
+                codOrigen, codDestino, montoBruto, tipoTransferenciaIntentada(origen, destino), fechaOperacion);
 
         DetectorRiesgo.Evaluacion riesgo = detectorRiesgo.evaluar(
-                usuario.getId(), monto, true, codOrigen, codDestino, LocalDateTime.now());
+                usuario.getId(), monto, true, codOrigen, codDestino, fechaOperacion);
 
         // Las dos modificaciones están protegidas por las validaciones previas.
         origen.retirar(monto);
@@ -372,7 +421,7 @@ public class FintechController {
         TipoTransaccion tipo = usuario.getId().equals(propietarioDestino.getId())
                 ? TipoTransaccion.TRANSFERENCIA_INTERNA
                 : TipoTransaccion.TRANSFERENCIA_EXTERNA;
-        return registrar(usuario, origen, destino, monto, tipo, puntos, riesgo);
+        return registrar(usuario, origen, destino, monto, tipo, puntos, riesgo, fechaOperacion);
     }
 
     /**
@@ -381,34 +430,33 @@ public class FintechController {
      */
     private Transaccion registrar(Usuario actor, Billetera origen, Billetera destino,
                                   int monto, TipoTransaccion tipo, int puntos,
-                                  DetectorRiesgo.Evaluacion riesgo) {
+                                  DetectorRiesgo.Evaluacion riesgo, LocalDateTime fechaOperacion) {
         // Evita que el acumulado de puntos desborde aunque una cuenta opere durante años.
         puntos = Math.min(puntos, Integer.MAX_VALUE - actor.getPuntosAcumulados());
-        contadorTransacciones++;
-        LocalDateTime fechaOperacion = LocalDateTime.now();
+        String idTransaccion = siguienteIdTransaccion();
 
         Transaccion tx = new Transaccion(
-                "TX-" + contadorTransacciones,
+                idTransaccion,
                 monto,
                 String.valueOf(origen.getCodigo()),
                 destino == null ? null : String.valueOf(destino.getCodigo()),
                 fechaOperacion,
                 tipo,
-                "EXITOSA",
+                Transaccion.EXITOSA,
                 puntos,
                 riesgo.getNivel()
         );
         historialGlobal.addLast(tx);
-        actor.getHistorialTransacciones().addLast(tx);
-        origen.getHistorialTransacciones().addLast(tx);
+        actor.registrarTransaccion(tx);
+        origen.registrarTransaccion(tx);
 
         if (destino != null) {
-            destino.getHistorialTransacciones().addLast(tx);
+            destino.registrarTransaccion(tx);
 
             Usuario duenoDestino = usuariosPorId.buscar(destino.getIdUsuario());
 
             if (duenoDestino != null && !duenoDestino.getId().equals(actor.getId())) {
-                duenoDestino.getHistorialTransacciones().addLast(tx);
+                duenoDestino.registrarTransaccion(tx);
                 if (tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA) {
                     registrarTransferenciaEnGrafo(actor.getId(), duenoDestino.getId(), monto);
                 }
@@ -425,23 +473,69 @@ public class FintechController {
             detectorRiesgo.registrarEvento(actor.getId(), tx.getId(), riesgo, tx.getFechaHora());
             generarAlertaParaUsuario(actor,
                     "Riesgo " + riesgo.getNivel() + " en " + tx.getId() + ": " + riesgo.getMotivo(),
-                    "SEGURIDAD");
+                    "SEGURIDAD", fechaOperacion);
         }
 
-        otorgarPuntos(actor, puntos);
+        otorgarPuntos(actor, puntos, fechaOperacion);
 
         if (tipo != TipoTransaccion.RECARGA && origen.getSaldo() < UMBRAL_SALDO_BAJO) {
             generarAlertaParaUsuario(actor,
                     "Saldo bajo en la billetera " + origen.getCodigo() + ": $" + origen.getSaldo(),
-                    "SALDO_BAJO");
+                    "SALDO_BAJO", fechaOperacion);
         }
 
         return tx;
     }
 
-    private Transaccion rechazar(Usuario usuario, String motivo) {
-        generarAlertaParaUsuario(usuario, motivo, "OPERACION_RECHAZADA");
+    private Transaccion rechazar(Usuario usuario, String motivo, int codigoOrigen, Integer codigoDestino,
+                                  double montoBruto, TipoTransaccion tipo) {
+        return rechazar(usuario, motivo, codigoOrigen, codigoDestino, montoBruto, tipo, LocalDateTime.now());
+    }
+
+    private Transaccion rechazar(Usuario usuario, String motivo, int codigoOrigen, Integer codigoDestino,
+                                  double montoBruto, TipoTransaccion tipo, LocalDateTime fechaOperacion) {
+        if (usuario == null) return null;
+
+        Integer monto = convertirMonto(montoBruto);
+        boolean esTransferencia = tipo == TipoTransaccion.TRANSFERENCIA_INTERNA
+                || tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA;
+        if (monto != null && codigoOrigen > 0 && tipo != null
+                && (!esTransferencia || codigoDestino != null && codigoDestino > 0)) {
+            String idTransaccion = siguienteIdTransaccion();
+            Transaccion rechazada = new Transaccion(
+                    idTransaccion, monto, String.valueOf(codigoOrigen),
+                    esTransferencia ? String.valueOf(codigoDestino) : null,
+                    fechaOperacion, tipo, Transaccion.RECHAZADA, 0, NivelRiesgo.BAJO);
+            historialGlobal.addLast(rechazada);
+            usuario.registrarTransaccion(rechazada);
+
+            Billetera origen = billeterasPorCodigo.buscar(codigoOrigen);
+            if (origen != null && usuario.getId().equals(origen.getIdUsuario())) {
+                origen.registrarTransaccion(rechazada);
+            }
+            if (esTransferencia && codigoDestino != codigoOrigen) {
+                Billetera destino = billeterasPorCodigo.buscar(codigoDestino);
+                if (destino != null && usuario.getId().equals(destino.getIdUsuario())) {
+                    destino.registrarTransaccion(rechazada);
+                }
+            }
+        }
+
+        generarAlertaParaUsuario(usuario, motivo, "OPERACION_RECHAZADA", fechaOperacion);
         return null;
+    }
+
+    private TipoTransaccion tipoTransferenciaIntentada(Billetera origen, Billetera destino) {
+        return origen != null && destino != null
+                && origen.getIdUsuario() != null
+                && origen.getIdUsuario().equals(destino.getIdUsuario())
+                ? TipoTransaccion.TRANSFERENCIA_INTERNA
+                : TipoTransaccion.TRANSFERENCIA_EXTERNA;
+    }
+
+    private String siguienteIdTransaccion() {
+        contadorTransacciones = Math.incrementExact(contadorTransacciones);
+        return "TX-" + contadorTransacciones;
     }
 
     /** Convierte a int solo montos enteros, positivos y representables. */
@@ -461,7 +555,7 @@ public class FintechController {
      * Suma puntos al usuario. Como el árbol ordena por puntos, el usuario
      * se saca antes de cambiar su puntaje y se reinserta después.
      */
-    private void otorgarPuntos(Usuario usuario, int puntos) {
+    private void otorgarPuntos(Usuario usuario, int puntos, LocalDateTime fechaOperacion) {
         if (puntos <= 0) return;
         String nivelAnterior = usuario.getNivel();
         boolean activo = usuario.isActivo();
@@ -472,7 +566,8 @@ public class FintechController {
             if (activo) arbolUsuariosPorPuntos.insertar(usuario);
         }
         if (!nivelAnterior.equals(usuario.getNivel())) {
-            generarAlertaParaUsuario(usuario, "¡Ascendiste al nivel " + usuario.getNivel() + "!", "ASCENSO_NIVEL");
+            generarAlertaParaUsuario(usuario, "¡Ascendiste al nivel " + usuario.getNivel() + "!",
+                    "ASCENSO_NIVEL", fechaOperacion);
         }
     }
 
@@ -508,7 +603,7 @@ public class FintechController {
 
         Transaccion tx = pilaReversiones.peek();
 
-        if (!"EXITOSA".equals(tx.getEstado())) {
+        if (!Transaccion.EXITOSA.equals(tx.getEstado())) {
             pilaReversiones.pop();
             return false;
         }
@@ -589,10 +684,11 @@ public class FintechController {
         if (id == null || id.trim().isEmpty() || existeIdOperacionProgramada(id.trim())
                 || origen == null || !origen.isActivo()
                 || tipo == null || fechaHora == null || frecuencia == null
+                || !OperacionProgramada.PENDIENTE.equals(estado)
                 || convertirMonto(valor) == null) {
             return false;
         }
-        Usuario usuarioOrigen = buscarUsuario(origen.getIdUsuario());
+        Usuario usuarioOrigen = buscarUsuarioInterno(origen.getIdUsuario());
         if (usuarioOrigen == null) return false;
 
         boolean esTransferencia = tipo == TipoTransaccion.TRANSFERENCIA_INTERNA
@@ -600,7 +696,12 @@ public class FintechController {
         if (esTransferencia) {
             Billetera destino = billeterasPorCodigo.buscar(codDestino);
             if (destino == null || !destino.isActivo() || codOrigen == codDestino
-                    || buscarUsuario(destino.getIdUsuario()) == null) return false;
+                    || buscarUsuarioInterno(destino.getIdUsuario()) == null) return false;
+            boolean mismoPropietario = origen.getIdUsuario().equals(destino.getIdUsuario());
+            if (mismoPropietario != (tipo == TipoTransaccion.TRANSFERENCIA_INTERNA)) return false;
+        } else if (codDestino != 0) {
+            // Un destino en recargas/retiros sería una referencia financiera falsa.
+            return false;
         }
 
         try {
@@ -627,6 +728,32 @@ public class FintechController {
         return false;
     }
 
+    /** Cancela una operación pendiente que pertenezca al usuario indicado. */
+    public boolean cancelarOperacionProgramada(String idUsuario, String idOperacion) {
+        if (idUsuario == null || idUsuario.trim().isEmpty()
+                || idOperacion == null || idOperacion.trim().isEmpty()) return false;
+
+        String idNormalizado = idOperacion.trim();
+        SimpleLinkedList<OperacionProgramada> pendientes = operacionesProgramadas.aListaOrdenada();
+        OperacionProgramada encontrada = null;
+        for (OperacionProgramada operacion : pendientes) {
+            if (operacion.getId().equals(idNormalizado)
+                    && idUsuario.trim().equals(operacion.getIdUsuario())) {
+                encontrada = operacion;
+                break;
+            }
+        }
+        if (encontrada == null) return false;
+
+        encontrada.actualizarEstado(OperacionProgramada.CANCELADA_POR_USUARIO);
+        operacionesProgramadas.clear();
+        for (OperacionProgramada operacion : pendientes) {
+            if (operacion != encontrada) operacionesProgramadas.encolar(operacion);
+        }
+        operacionesProcesadas.addLast(encontrada);
+        return true;
+    }
+
     /**
      * Genera una sola alerta por cada ocurrencia de una operación programada
      * cuando entra en la ventana de los próximos diez minutos. Si ya venció,
@@ -640,12 +767,12 @@ public class FintechController {
         LocalDateTime limite = ahora.plusMinutes(10);
         for (OperacionProgramada op : operacionesProgramadas.aListaOrdenada()) {
             if (!op.isNotificacionProximaEnviada() && !op.getFechaHora().isAfter(limite)) {
-                Usuario usuario = buscarUsuario(op.getIdUsuario());
+                Usuario usuario = buscarUsuarioInterno(op.getIdUsuario());
                 if (usuario != null) {
                     generarAlertaParaUsuario(usuario,
                             "La operación programada " + op.getId() + " está próxima a ejecutarse ("
                                     + op.getFechaHora() + ").",
-                            "OPERACION_PROGRAMADA_PROXIMA");
+                            "OPERACION_PROGRAMADA_PROXIMA", ahora);
                     op.setNotificacionProximaEnviada(true);
                     notificadas++;
                 }
@@ -674,7 +801,7 @@ public class FintechController {
                 && !operacionesProgramadas.consultarPrimero().getFechaHora().isAfter(ahora)) {
 
             OperacionProgramada op = operacionesProgramadas.desencolar();
-            boolean propietarioActivo = buscarUsuario(op.getIdUsuario()) != null;
+            boolean propietarioActivo = buscarUsuarioInterno(op.getIdUsuario()) != null;
             boolean billeteraOrigenActiva = false;
             boolean billeteraDestinoActiva = true;
             try {
@@ -684,7 +811,7 @@ public class FintechController {
                         || op.getTipo() == TipoTransaccion.TRANSFERENCIA_EXTERNA) {
                     Billetera destinoProgramado = billeterasPorCodigo.buscar(Integer.parseInt(op.getBilleteraDestino()));
                     billeteraDestinoActiva = destinoProgramado != null && destinoProgramado.isActivo()
-                            && buscarUsuario(destinoProgramado.getIdUsuario()) != null;
+                            && buscarUsuarioInterno(destinoProgramado.getIdUsuario()) != null;
                 }
             } catch (NumberFormatException ignored) {
                 // Una referencia dañada se archivará como cancelada, sin bloquear la cola.
@@ -696,14 +823,14 @@ public class FintechController {
                 continue;
             }
 
-            boolean exito = ejecutarOperacionProgramada(op) != null;
+            boolean exito = ejecutarOperacionProgramada(op, ahora) != null;
             if (exito) ejecutadas++;
 
             if (op.getFrecuencia() == Frecuencia.UNICA) {
                 op.actualizarEstado(exito ? "EJECUTADA" : "FALLIDA");
                 operacionesProcesadas.addLast(op);
             } else {
-                op.reprogramar(siguienteFecha(op.getFechaHora(), op.getFrecuencia(), ahora));
+                op.reprogramar(siguienteFecha(op, ahora));
                 op.setNotificacionProximaEnviada(false);
                 operacionesProgramadas.encolar(op);
             }
@@ -712,7 +839,7 @@ public class FintechController {
         return ejecutadas;
     }
 
-    private Transaccion ejecutarOperacionProgramada(OperacionProgramada op) {
+    private Transaccion ejecutarOperacionProgramada(OperacionProgramada op, LocalDateTime fechaEjecucion) {
         int codOrigen = Integer.parseInt(op.getBilleteraOrigen());
         Billetera origen = billeterasPorCodigo.buscar(codOrigen);
 
@@ -722,9 +849,9 @@ public class FintechController {
 
         switch (op.getTipo()) {
             case RECARGA:
-                return ejecutarRecarga(codOrigen, op.getValor(), idUsuario, true);
+                return ejecutarRecarga(codOrigen, op.getValor(), idUsuario, true, fechaEjecucion);
             case RETIRO:
-                return ejecutarRetiro(codOrigen, op.getValor(), idUsuario, true);
+                return ejecutarRetiro(codOrigen, op.getValor(), idUsuario, true, fechaEjecucion);
             case TRANSFERENCIA_INTERNA:
             case TRANSFERENCIA_EXTERNA:
                 return ejecutarTransferencia(
@@ -732,31 +859,36 @@ public class FintechController {
                         Integer.parseInt(op.getBilleteraDestino()),
                         op.getValor(),
                         idUsuario,
-                        true
+                        true,
+                        fechaEjecucion
                 );
             default:
                 return null;
         }
     }
 
-    private LocalDateTime siguienteFecha(LocalDateTime actual, Frecuencia frecuencia, LocalDateTime ahora) {
-        LocalDateTime fecha = actual;
+    private LocalDateTime siguienteFecha(OperacionProgramada operacion, LocalDateTime ahora) {
+        if (operacion.getFrecuencia() == Frecuencia.UNICA) {
+            throw new IllegalArgumentException("Una operación única no tiene siguiente ocurrencia.");
+        }
 
-        do {
-            fecha = frecuencia == Frecuencia.SEMANAL ? fecha.plusWeeks(1) : fecha.plusMonths(1);
-        } while (!fecha.isAfter(ahora));
-
-        return fecha;
+        return operacion.calcularSiguienteFechaPosteriorA(ahora);
     }
 
     /** @return operaciones pendientes ordenadas por fecha de ejecución. */
     public SimpleLinkedList<OperacionProgramada> obtenerOperacionesPendientes() {
-        return operacionesProgramadas.aListaOrdenada();
+        SimpleLinkedList<OperacionProgramada> copia = new SimpleLinkedList<>();
+        for (OperacionProgramada operacion : operacionesProgramadas.aListaOrdenada()) {
+            copia.addLast(operacion.copia());
+        }
+        return copia;
     }
 
-    /** @return operaciones únicas ya procesadas (ejecutadas o fallidas). */
+    /** @return operaciones finalizadas o canceladas, sin exponer objetos internos. */
     public SimpleLinkedList<OperacionProgramada> obtenerOperacionesProcesadas() {
-        return copiarLista(operacionesProcesadas);
+        SimpleLinkedList<OperacionProgramada> copia = new SimpleLinkedList<>();
+        for (OperacionProgramada operacion : operacionesProcesadas) copia.addLast(operacion.copia());
+        return copia;
     }
 
     // ------------------------------------------------------------------
@@ -766,7 +898,7 @@ public class FintechController {
     /** Registra un beneficio nuevo. Los identificadores se guardan en mayúscula. */
     public boolean registrarBeneficio(String id, String nombre, String descripcion, int costoPuntos) {
         if (id == null || id.trim().isEmpty()) return false;
-        String idNormalizado = id.trim().toUpperCase();
+        String idNormalizado = id.trim().toUpperCase(Locale.ROOT);
         if (beneficiosPorId.buscar(idNormalizado) != null) return false;
         try {
             Beneficio beneficio = new Beneficio(idNormalizado, nombre, descripcion, costoPuntos);
@@ -780,7 +912,7 @@ public class FintechController {
 
     /** Busca por identificador sin distinguir mayúsculas ni espacios exteriores. */
     private Beneficio buscarBeneficioInterno(String id) {
-        return id == null ? null : beneficiosPorId.buscar(id.trim().toUpperCase());
+        return id == null ? null : beneficiosPorId.buscar(id.trim().toUpperCase(Locale.ROOT));
     }
 
     /** Devuelve una copia del beneficio para impedir modificaciones externas al catálogo. */
@@ -839,12 +971,17 @@ public class FintechController {
      * Retorna null cuando el usuario, beneficio o saldo de puntos no son válidos.
      */
     public CanjeBeneficio canjearBeneficio(String idUsuario, String idBeneficio) {
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
         Beneficio beneficio = buscarBeneficioInterno(idBeneficio);
         if (usuario == null || beneficio == null || !beneficio.isActivo()) return null;
         if (usuario.getPuntosAcumulados() < beneficio.getCostoPuntos()) return null;
 
-        long siguiente = contadorCanjes + 1;
+        final long siguiente;
+        try {
+            siguiente = Math.incrementExact(contadorCanjes);
+        } catch (ArithmeticException ex) {
+            return null;
+        }
         CanjeBeneficio canje;
         try {
             canje = new CanjeBeneficio(
@@ -885,7 +1022,7 @@ public class FintechController {
 
     /** Marca como utilizado un canje, comprobando que pertenezca al usuario indicado. */
     public boolean utilizarCanjeBeneficio(String idUsuario, String idCanje) {
-        Usuario usuario = buscarUsuario(idUsuario);
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
         CanjeBeneficio canje = buscarCanjeBeneficioInterno(idCanje);
         if (usuario == null || canje == null || !usuario.getId().equals(canje.getIdUsuario())) return false;
         boolean actualizado = canje.marcarComoUtilizado();
@@ -1033,7 +1170,7 @@ public class FintechController {
             Grafo.Vertice<String> actual = cola.desencolar();
 
             for (Grafo.Arista<String> arista : actual.getAdyacentes()) {
-                // Una arista con peso 0 corresponde a una transferencia revertida.
+                // Las transferencias revertidas eliminan o reducen la arista en el grafo.
                 if (arista.getPeso() <= 0) {
                     continue;
                 }
@@ -1064,7 +1201,14 @@ public class FintechController {
      * operaciones reales ya se evalúan internamente con todos los criterios.
      */
     public boolean evaluarYGenerarAlertaInusual(Usuario usuario, double montoActual, String idTransaccion) {
-        if (usuario == null || !usuario.isActivo() || !Double.isFinite(montoActual)
+        if (usuario == null) return false;
+        return evaluarYGenerarAlertaInusual(usuario.getId(), montoActual, idTransaccion);
+    }
+
+    /** Variante preferida: resuelve el usuario desde el registro interno del sistema. */
+    public boolean evaluarYGenerarAlertaInusual(String idUsuario, double montoActual, String idTransaccion) {
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
+        if (usuario == null || !Double.isFinite(montoActual)
                 || montoActual <= 0 || montoActual != Math.rint(montoActual)
                 || montoActual > Integer.MAX_VALUE) return false;
         int monto = (int) montoActual;
@@ -1072,12 +1216,11 @@ public class FintechController {
         DetectorRiesgo.Evaluacion evaluacion = detectorRiesgo.evaluar(
                 usuario.getId(), monto, true, -1, null, LocalDateTime.now());
 
-        if (evaluacion.getNivel() == NivelRiesgo.BAJO) {
-            return false;
-        }
+        if (evaluacion.getNivel() == NivelRiesgo.BAJO) return false;
 
-        detectorRiesgo.registrarEvento(usuario.getId(), idTransaccion == null ? "EVALUACION-MANUAL" : idTransaccion,
-                evaluacion, LocalDateTime.now());
+        String id = idTransaccion == null || idTransaccion.trim().isEmpty()
+                ? "EVALUACION-MANUAL" : idTransaccion.trim();
+        detectorRiesgo.registrarEvento(usuario.getId(), id, evaluacion, LocalDateTime.now());
         generarAlertaParaUsuario(usuario, evaluacion.getMotivo(), "SEGURIDAD");
         return true;
     }
@@ -1091,9 +1234,65 @@ public class FintechController {
         return analitica;
     }
 
+    /** Lista los usuarios activos en el orden de registro, mediante copias defensivas. */
+    public SimpleLinkedList<Usuario> obtenerUsuarios() {
+        SimpleLinkedList<Usuario> resultado = new SimpleLinkedList<>();
+        for (Usuario usuario : listaUsuarios) {
+            if (usuario.isActivo()) resultado.addLast(usuario.copia());
+        }
+        return resultado;
+    }
+
+    /** Billeteras de un usuario activo, sin exponer los objetos internos. */
+    public SimpleLinkedList<Billetera> obtenerBilleterasUsuario(String idUsuario) {
+        Usuario usuario = buscarUsuarioInterno(idUsuario);
+        return usuario == null ? new SimpleLinkedList<>() : usuario.getBilleteras();
+    }
+
+    /** Historial de un usuario, incluso si fue dado de baja. */
+    public SimpleLinkedList<Transaccion> obtenerHistorialTransaccionesUsuario(String idUsuario) {
+        SimpleLinkedList<Transaccion> resultado = new SimpleLinkedList<>();
+        if (idUsuario == null) return resultado;
+        Usuario usuario = usuariosPorId.buscar(idUsuario.trim());
+        if (usuario != null) {
+            for (Transaccion transaccion : usuario.getHistorialTransacciones()) {
+                resultado.addLast(transaccion.copia());
+            }
+        }
+        return resultado;
+    }
+
+    /** Historial de una billetera, incluso si está inactiva. */
+    public SimpleLinkedList<Transaccion> obtenerHistorialTransaccionesBilletera(int codigoBilletera) {
+        Billetera billetera = billeterasPorCodigo.buscar(codigoBilletera);
+        return billetera == null ? new SimpleLinkedList<>() : billetera.getHistorialTransacciones();
+    }
+
+    /** Historial de alertas de un usuario, incluso si fue dado de baja. */
+    public SimpleLinkedList<Alerta> obtenerHistorialAlertasUsuario(String idUsuario) {
+        SimpleLinkedList<Alerta> resultado = new SimpleLinkedList<>();
+        if (idUsuario == null) return resultado;
+        Usuario usuario = usuariosPorId.buscar(idUsuario.trim());
+        if (usuario != null) {
+            for (Alerta alerta : usuario.getHistorialAlertas()) resultado.addLast(alerta.copia());
+        }
+        return resultado;
+    }
+
+    /** Busca una transacción por identificador y devuelve una copia. */
+    public Transaccion buscarTransaccion(String idTransaccion) {
+        if (idTransaccion == null || idTransaccion.trim().isEmpty()) return null;
+        for (Transaccion transaccion : historialGlobal) {
+            if (transaccion.getId().equalsIgnoreCase(idTransaccion.trim())) return transaccion.copia();
+        }
+        return null;
+    }
+
     /** @return todas las transacciones registradas, en orden cronológico. */
     public SimpleLinkedList<Transaccion> obtenerHistorialGlobal() {
-        return copiarLista(historialGlobal);
+        SimpleLinkedList<Transaccion> copia = new SimpleLinkedList<>();
+        for (Transaccion transaccion : historialGlobal) copia.addLast(transaccion.copia());
+        return copia;
     }
 
     /** @return historial de auditoría de riesgo (eventos MEDIO y ALTO). */
@@ -1125,7 +1324,7 @@ public class FintechController {
         if (notificacionesPendientes.isEmpty()) return null;
         Alerta alerta = notificacionesPendientes.desencolar();
         alerta.marcarAtendida();
-        return alerta;
+        return alerta.copia();
     }
 
     public int getCantidadOperacionesProgramadasPendientes() {
@@ -1134,10 +1333,18 @@ public class FintechController {
 
     /** Crea la alerta, la guarda en el historial del usuario y la muestra en consola. */
     private void generarAlertaParaUsuario(Usuario usuario, String mensaje, String tipoAlerta) {
-        contadorAlertas++;
+        generarAlertaParaUsuario(usuario, mensaje, tipoAlerta, LocalDateTime.now());
+    }
 
-        Alerta alerta = new Alerta(contadorAlertas, LocalDateTime.now(), mensaje, tipoAlerta);
-        usuario.getHistorialAlertas().addLast(alerta);
+    private void generarAlertaParaUsuario(Usuario usuario, String mensaje, String tipoAlerta,
+                                          LocalDateTime fechaGeneracion) {
+        if (usuario == null || fechaGeneracion == null) {
+            throw new IllegalArgumentException("El usuario y la fecha de la alerta son obligatorios.");
+        }
+        contadorAlertas = Math.incrementExact(contadorAlertas);
+
+        Alerta alerta = new Alerta(contadorAlertas, fechaGeneracion, mensaje, tipoAlerta);
+        usuario.registrarAlerta(alerta);
         notificacionesPendientes.encolar(alerta);
 
         System.out.println("⚠️ [" + tipoAlerta + "] Usuario: " + usuario.getNombre() + " - " + mensaje);

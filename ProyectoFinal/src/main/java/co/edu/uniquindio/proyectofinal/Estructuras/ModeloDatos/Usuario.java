@@ -1,76 +1,27 @@
-
 package co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos;
 
 import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.SimpleLinkedList;
 
-/**
- * Representa a un usuario registrado en el sistema Fintech.
- *
- * Un usuario puede administrar varias billeteras, acumular puntos
- * de fidelización y consultar su historial de transacciones y alertas.
- *
- * Implementa Comparable para permitir su organización en el árbol
- * binario de búsqueda según los puntos acumulados.
- *
- * Cuando dos usuarios tienen los mismos puntos, se utiliza su
- * identificador como criterio secundario de comparación.
- *
- * @author Proyecto Fintech
- * @version 1.0
- */
+/** Usuario del sistema. Sus colecciones se consultan mediante copias defensivas. */
 public class Usuario implements Comparable<Usuario> {
 
-    /** Identificador único del usuario. */
     private final String id;
-
-    /** Nombre completo del usuario. */
     private String nombre;
-
-    /** Correo electrónico del usuario. */
     private String correo;
-
-    /** Puntos acumulados por operaciones válidas. */
     private int puntosAcumulados;
-
-    /** Nivel de fidelización actual. */
     private String nivel;
-
-    /** Billeteras asociadas al usuario. */
-    private SimpleLinkedList<Billetera> billeteras;
-
-    /** Historial de transacciones del usuario. */
-    private SimpleLinkedList<Transaccion> historialTransacciones;
-
-    /** Historial de alertas generadas para el usuario. */
-    private SimpleLinkedList<Alerta> historialAlertas;
-
-    /** Historial de beneficios canjeados por el usuario. */
-    private SimpleLinkedList<CanjeBeneficio> historialCanjes;
-
-    /** Estado lógico: los usuarios eliminados se conservan para auditoría. */
+    private final SimpleLinkedList<Billetera> billeteras;
+    private final SimpleLinkedList<Transaccion> historialTransacciones;
+    private final SimpleLinkedList<Alerta> historialAlertas;
+    private final SimpleLinkedList<CanjeBeneficio> historialCanjes;
     private boolean activo;
 
-    /**
-     * Construye un usuario nuevo.
-     *
-     * @param id identificador único.
-     * @param nombre nombre del usuario.
-     * @param correo correo electrónico.
-     *
-     * @throws IllegalArgumentException si alguno de los textos
-     * obligatorios es null o está vacío.
-     */
     public Usuario(String id, String nombre, String correo) {
-        validarTexto(id, "El identificador");
-        validarTexto(nombre, "El nombre");
-        validarTexto(correo, "El correo");
-
-        this.id = id.trim();
-        this.nombre = nombre.trim();
-        this.correo = correo.trim();
+        this.id = validarTexto(id, "El identificador");
+        this.nombre = validarTexto(nombre, "El nombre");
+        this.correo = validarCorreo(correo);
         this.puntosAcumulados = 0;
         this.nivel = "Bronce";
-
         this.billeteras = new SimpleLinkedList<>();
         this.historialTransacciones = new SimpleLinkedList<>();
         this.historialAlertas = new SimpleLinkedList<>();
@@ -78,153 +29,125 @@ public class Usuario implements Comparable<Usuario> {
         this.activo = true;
     }
 
-    /**
-     * Actualiza el nivel según los puntos acumulados.
-     *
-     * Rangos conservados del proyecto:
-     * - Bronce: hasta 500 puntos.
-     * - Plata: más de 500 y hasta 1000.
-     * - Oro: más de 1000 y hasta 5000.
-     * - Platino: más de 5000.
-     */
-    public void actualizarNivel() {
-        if (puntosAcumulados > 5000) {
-            nivel = "Platino";
-        } else if (puntosAcumulados > 1000) {
-            nivel = "Oro";
-        } else if (puntosAcumulados > 500) {
-            nivel = "Plata";
-        } else {
-            nivel = "Bronce";
-        }
+    private Usuario(Usuario original) {
+        this.id = original.id;
+        this.nombre = original.nombre;
+        this.correo = original.correo;
+        this.puntosAcumulados = original.puntosAcumulados;
+        this.nivel = original.nivel;
+        this.activo = original.activo;
+        this.billeteras = new SimpleLinkedList<>();
+        this.historialTransacciones = new SimpleLinkedList<>();
+        this.historialAlertas = new SimpleLinkedList<>();
+        this.historialCanjes = new SimpleLinkedList<>();
+        for (Billetera billetera : original.billeteras) this.billeteras.addLast(billetera.copia());
+        for (Transaccion transaccion : original.historialTransacciones) this.historialTransacciones.addLast(transaccion.copia());
+        for (Alerta alerta : original.historialAlertas) this.historialAlertas.addLast(alerta.copia());
+        for (CanjeBeneficio canje : original.historialCanjes) this.historialCanjes.addLast(canje.copia());
     }
 
-    /**
-     * Agrega puntos al usuario.
-     *
-     * @param puntos cantidad que se agregará.
-     * @throws IllegalArgumentException si la cantidad es negativa.
-     * @throws ArithmeticException si se produce desbordamiento entero.
-     */
-    public void agregarPuntos(int puntos) {
-        if (puntos < 0) {
-            throw new IllegalArgumentException(
-                    "No se pueden agregar puntos negativos."
-            );
-        }
+    /** Copia profunda para consultas externas; no comparte saldos ni historiales mutables. */
+    public Usuario copia() {
+        return new Usuario(this);
+    }
 
+    public void actualizarNivel() {
+        if (puntosAcumulados > 5000) nivel = "Platino";
+        else if (puntosAcumulados > 1000) nivel = "Oro";
+        else if (puntosAcumulados > 500) nivel = "Plata";
+        else nivel = "Bronce";
+    }
+
+    public void agregarPuntos(int puntos) {
+        if (puntos < 0) throw new IllegalArgumentException("No se pueden agregar puntos negativos.");
         puntosAcumulados = Math.addExact(puntosAcumulados, puntos);
         actualizarNivel();
     }
 
-    /**
-     * Resta puntos al usuario.
-     *
-     * Se utiliza principalmente al revertir operaciones financieras.
-     *
-     * @param puntos cantidad que se descontará.
-     * @throws IllegalArgumentException si la cantidad es negativa.
-     */
     public void descontarPuntos(int puntos) {
-        if (puntos < 0) {
-            throw new IllegalArgumentException(
-                    "La cantidad a descontar no puede ser negativa."
-            );
-        }
-
-        if (puntos > puntosAcumulados) {
-            throw new IllegalArgumentException(
-                    "El usuario no tiene suficientes puntos."
-            );
-        }
-
+        if (puntos < 0) throw new IllegalArgumentException("La cantidad a descontar no puede ser negativa.");
+        if (puntos > puntosAcumulados) throw new IllegalArgumentException("El usuario no tiene suficientes puntos.");
         puntosAcumulados -= puntos;
         actualizarNivel();
     }
 
-    /**
-     * Compara dos usuarios por sus puntos acumulados.
-     *
-     * Si tienen la misma cantidad de puntos, compara sus identificadores.
-     *
-     * @param otro usuario que se comparará.
-     * @return valor negativo, cero o positivo según el orden.
-     * @throws NullPointerException si el otro usuario es null.
-     */
     @Override
     public int compareTo(Usuario otro) {
-        if (otro == null) {
-            throw new NullPointerException(
-                    "No se puede comparar con un usuario null."
-            );
-        }
-
-        int comparacionPuntos = Integer.compare(
-                this.puntosAcumulados,
-                otro.puntosAcumulados
-        );
-
-        if (comparacionPuntos != 0) {
-            return comparacionPuntos;
-        }
-
-        return this.id.compareTo(otro.id);
+        if (otro == null) throw new NullPointerException("No se puede comparar con un usuario null.");
+        int comparacionPuntos = Integer.compare(puntosAcumulados, otro.puntosAcumulados);
+        return comparacionPuntos != 0 ? comparacionPuntos : id.compareTo(otro.id);
     }
 
-    /** @return identificador del usuario. */
-    public String getId() {
-        return id;
+    public String getId() { return id; }
+    public String getNombre() { return nombre; }
+    public void setNombre(String nombre) { this.nombre = validarTexto(nombre, "El nombre"); }
+    public String getCorreo() { return correo; }
+    public void setCorreo(String correo) { this.correo = validarCorreo(correo); }
+
+    /** Valida ambos campos antes de modificar cualquiera de ellos. */
+    public void actualizarDatos(String nombre, String correo) {
+        String nombreValidado = validarTexto(nombre, "El nombre");
+        String correoValidado = validarCorreo(correo);
+        this.nombre = nombreValidado;
+        this.correo = correoValidado;
     }
 
+    public int getPuntosAcumulados() { return puntosAcumulados; }
+    public String getNivel() { return nivel; }
+    public boolean isActivo() { return activo; }
 
-    /** @return nombre del usuario. */
-    public String getNombre() {
-        return nombre;
-    }
-
-    /** @param nombre nuevo nombre. */
-    public void setNombre(String nombre) {
-        validarTexto(nombre, "El nombre");
-        this.nombre = nombre.trim();
-    }
-
-    /** @return correo electrónico. */
-    public String getCorreo() {
-        return correo;
-    }
-
-    /** @param correo nuevo correo. */
-    public void setCorreo(String correo) {
-        validarTexto(correo, "El correo");
-        this.correo = correo.trim();
-    }
-
-    /** @return puntos acumulados. */
-    public int getPuntosAcumulados() {
-        return puntosAcumulados;
-    }
-
-    /** @return nivel de fidelización. */
-    public String getNivel() {
-        return nivel;
-    }
-
-    /** @return lista de billeteras. */
+    /** Devuelve billeteras independientes para que una vista no cambie los objetos internos. */
     public SimpleLinkedList<Billetera> getBilleteras() {
-        return billeteras;
+        SimpleLinkedList<Billetera> copia = new SimpleLinkedList<>();
+        for (Billetera billetera : billeteras) copia.addLast(billetera.copia());
+        return copia;
     }
 
-    /** @return historial de transacciones. */
     public SimpleLinkedList<Transaccion> getHistorialTransacciones() {
-        return historialTransacciones;
+        SimpleLinkedList<Transaccion> copia = new SimpleLinkedList<>();
+        for (Transaccion transaccion : historialTransacciones) copia.addLast(transaccion.copia());
+        return copia;
     }
 
-    /** @return historial de alertas. */
     public SimpleLinkedList<Alerta> getHistorialAlertas() {
-        return historialAlertas;
+        SimpleLinkedList<Alerta> copia = new SimpleLinkedList<>();
+        for (Alerta alerta : historialAlertas) copia.addLast(alerta.copia());
+        return copia;
     }
 
-    /** Registra un canje en el historial privado del usuario. */
+    public SimpleLinkedList<CanjeBeneficio> getHistorialCanjes() {
+        SimpleLinkedList<CanjeBeneficio> copia = new SimpleLinkedList<>();
+        for (CanjeBeneficio canje : historialCanjes) copia.addLast(canje.copia());
+        return copia;
+    }
+
+    /* Operaciones de dominio: las utiliza la fachada del sistema. */
+    public void agregarBilletera(Billetera billetera) {
+        if (billetera == null || !id.equals(billetera.getIdUsuario())) {
+            throw new IllegalArgumentException("La billetera debe pertenecer a este usuario.");
+        }
+        for (Billetera existente : billeteras) {
+            if (existente.getCodigo() == billetera.getCodigo()) {
+                throw new IllegalArgumentException("El usuario ya tiene una billetera con ese código.");
+            }
+        }
+        billeteras.addLast(billetera);
+    }
+
+    public void desactivarBilleteras() {
+        for (Billetera billetera : billeteras) billetera.setActivo(false);
+    }
+
+    public void registrarTransaccion(Transaccion transaccion) {
+        if (transaccion == null) throw new IllegalArgumentException("La transacción no puede ser null.");
+        historialTransacciones.addLast(transaccion);
+    }
+
+    public void registrarAlerta(Alerta alerta) {
+        if (alerta == null) throw new IllegalArgumentException("La alerta no puede ser null.");
+        historialAlertas.addLast(alerta);
+    }
+
     public void registrarCanje(CanjeBeneficio canje) {
         if (canje == null || !id.equals(canje.getIdUsuario())) {
             throw new IllegalArgumentException("El canje no pertenece a este usuario.");
@@ -232,34 +155,21 @@ public class Usuario implements Comparable<Usuario> {
         historialCanjes.addLast(canje);
     }
 
-    /** @return copia del historial; evita que una vista modifique los registros internos. */
-    public SimpleLinkedList<CanjeBeneficio> getHistorialCanjes() {
-        SimpleLinkedList<CanjeBeneficio> copia = new SimpleLinkedList<>();
-        for (CanjeBeneficio canje : historialCanjes) copia.addLast(canje.copia());
-        return copia;
-    }
+    /** Baja lógica; la fachada mantiene sincronizado el árbol de usuarios activos. */
+    public void setActivo(boolean activo) { this.activo = activo; }
 
-    /** @return true cuando el usuario puede operar en la plataforma. */
-    public boolean isActivo() {
-        return activo;
-    }
-
-    /** Permite activar o desactivar lógicamente al usuario sin perder su historial. */
-    public void setActivo(boolean activo) {
-        this.activo = activo;
-    }
-
-    /**
-     * Valida un texto obligatorio.
-     *
-     * @param texto texto recibido.
-     * @param nombre nombre del dato.
-     */
-    private static void validarTexto(String texto, String nombre) {
+    private static String validarTexto(String texto, String campo) {
         if (texto == null || texto.trim().isEmpty()) {
-            throw new IllegalArgumentException(
-                    nombre + " no puede estar vacío."
-            );
+            throw new IllegalArgumentException(campo + " no puede estar vacío.");
         }
+        return texto.trim();
+    }
+
+    private static String validarCorreo(String correo) {
+        String valor = validarTexto(correo, "El correo");
+        if (!valor.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new IllegalArgumentException("El correo electrónico no tiene un formato válido.");
+        }
+        return valor;
     }
 }

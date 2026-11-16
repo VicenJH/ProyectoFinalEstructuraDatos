@@ -33,6 +33,15 @@ public final class PruebasRegresionFintech {
         probarDetectorDeRiesgo();
         probarComparacionDeRendimiento();
         probarRespaldoSistema();
+        probarEncapsulacionDeConsultas();
+        probarRechazosYCancelacionProgramada();
+        probarRecurrenciaMensual();
+        probarActualizacionesAtomicas();
+        probarCatalogoYFlujoCompletoDeCanjes();
+        probarUmbralesDeNivelesYPuntosPorTipo();
+        probarFechaRealDeEjecucionProgramada();
+        probarConsultasDeLaFachada();
+        probarDatosDeDemostracionIntegrados();
         System.out.println("\nPRUEBAS DE REGRESIÓN SUPERADAS: " + pruebasEjecutadas);
     }
 
@@ -109,7 +118,12 @@ public final class PruebasRegresionFintech {
         comprobar(sistema.revertirUltimaOperacion(), "reversión transferencia");
         comprobar(sistema.buscarBilletera(101).getSaldo() == 50_000, "saldo origen restaurado");
         comprobar(sistema.buscarBilletera(201).getSaldo() == 0, "saldo destino restaurado");
-        comprobar("REVERTIDA".equals(transferencia.getEstado()), "estado de transacción revertida");
+        Transaccion transferenciaActualizada = sistema.obtenerHistorialGlobal()
+                .getNodeValue(sistema.obtenerHistorialGlobal().getSize() - 1);
+        comprobar(Transaccion.REVERTIDA.equals(transferenciaActualizada.getEstado()),
+                "estado de transacción revertida visible en una nueva consulta");
+        comprobar(Transaccion.EXITOSA.equals(transferencia.getEstado()),
+                "consulta previa no expone la transacción interna");
         comprobar(!sistema.existeRutaTransferencias("A", "B"), "arista eliminada tras reversión");
 
         comprobar(sistema.realizarTransferencia(101, 101, 100, "A") == false,
@@ -158,6 +172,7 @@ public final class PruebasRegresionFintech {
         Usuario usuario = sistema.buscarUsuario("R");
         comprobar(usuario.getPuntosAcumulados() == 1_000 && "Plata".equals(usuario.getNivel()), "puntos y nivel Plata");
         CanjeBeneficio canje = sistema.canjearBeneficio("R", "BEN-001");
+        usuario = sistema.buscarUsuario("R");
         comprobar(canje != null && usuario.getPuntosAcumulados() == 750, "canje descuenta puntos");
         comprobar(usuario.getHistorialCanjes().getSize() == 1, "historial individual de canjes");
         comprobar(!sistema.revertirUltimaOperacion(), "no revierte si puntos ya se gastaron");
@@ -207,6 +222,67 @@ public final class PruebasRegresionFintech {
         EventoAuditoria evento = detector.registrarEvento("R", "TX-SEG", rapido, ahora.plusSeconds(30));
         comprobar(evento.getNivel() == rapido.getNivel(), "evento guardado con nivel de riesgo correcto");
         comprobar(detector.obtenerHistorialAuditoria().getSize() == 1, "historial de auditoría consultable");
+        comprobar(detector.obtenerEventosPorUsuario("R").getSize() == 1,
+                "consulta de auditoría filtrada por usuario");
+        comprobar(detector.obtenerEventosPorNivel(NivelRiesgo.ALTO).getSize() == 1,
+                "consulta de auditoría filtrada por nivel");
+
+        LocalDateTime base = ahora.plusHours(2);
+        DetectorRiesgo promedio = new DetectorRiesgo();
+        for (int i = 0; i < 3; i++) {
+            promedio.registrarOperacion("AVG", 1_000, true, 10, null, base.plusMinutes(i));
+        }
+        DetectorRiesgo.Evaluacion montoInusual = promedio.evaluar("AVG", 4_001, true, 10, null,
+                base.plusMinutes(4));
+        comprobar(montoInusual.getNivel() == NivelRiesgo.MEDIO
+                        && montoInusual.getMotivo().contains("promedio"),
+                "monto saliente superior a tres veces el promedio genera riesgo");
+
+        DetectorRiesgo fragmentacion = new DetectorRiesgo();
+        fragmentacion.registrarOperacion("FRAG", 500, true, 31, null, base);
+        fragmentacion.registrarOperacion("FRAG", 500, true, 32, null, base.plusSeconds(30));
+        DetectorRiesgo.Evaluacion variasBilleteras = fragmentacion.evaluar(
+                "FRAG", 500, true, 33, null, base.plusSeconds(60));
+        comprobar(variasBilleteras.getNivel() == NivelRiesgo.MEDIO
+                        && variasBilleteras.getMotivo().contains("varias billeteras"),
+                "uso de tres billeteras en intervalo corto detecta posible fragmentación");
+
+        DetectorRiesgo frecuencia = new DetectorRiesgo();
+        for (int i = 0; i < 5; i++) {
+            frecuencia.registrarOperacion("FREQ", 100, true, 44, null, base.plusMinutes(i));
+        }
+        DetectorRiesgo.Evaluacion frecuenciaAlta = frecuencia.evaluar("FREQ", 100, true, 44, null,
+                base.plusMinutes(5));
+        comprobar(frecuenciaAlta.getNivel() == NivelRiesgo.MEDIO
+                        && frecuenciaAlta.getMotivo().contains("frecuencia"),
+                "sexta operación en menos de diez minutos detecta cambio de frecuencia");
+
+        DetectorRiesgo horario = new DetectorRiesgo();
+        for (int i = 0; i < 10; i++) {
+            horario.registrarOperacion("HORA", 100, false, 50, null,
+                    LocalDateTime.of(2030, 3, 1, 10, i));
+        }
+        DetectorRiesgo.Evaluacion horaInusual = horario.evaluar("HORA", 100, false, 50, null,
+                LocalDateTime.of(2030, 3, 2, 3, 0));
+        comprobar(horaInusual.getNivel() == NivelRiesgo.MEDIO
+                        && horaInusual.getMotivo().contains("horario no habitual"),
+                "actividad en una hora no observada antes genera riesgo medio");
+
+        DetectorRiesgo consecutividad = new DetectorRiesgo();
+        consecutividad.registrarOperacion("TIPO", 100, true, false, 60, null, base);
+        DetectorRiesgo.Evaluacion retiroYTransferencia = consecutividad.evaluar(
+                "TIPO", 100, true, true, 60, 61, base.plusSeconds(15));
+        comprobar(retiroYTransferencia.getNivel() == NivelRiesgo.BAJO,
+                "un retiro seguido de una transferencia no se confunde con dos transferencias consecutivas");
+
+        boolean rechazoRiesgoBajo = false;
+        try {
+            DetectorRiesgo.Evaluacion bajo = frecuencia.evaluar("OTRO", 100, false, 90, null, base);
+            detector.registrarEvento("R", "TX-BAJO", bajo, base);
+        } catch (IllegalArgumentException esperado) {
+            rechazoRiesgoBajo = true;
+        }
+        comprobar(rechazoRiesgoBajo, "auditoría rechaza registrar eventos de riesgo bajo");
     }
 
     private static void probarComparacionDeRendimiento() {
@@ -244,6 +320,280 @@ public final class PruebasRegresionFintech {
                 catch (java.io.IOException ignored) { }
             }
         }
+    }
+
+
+    private static void probarEncapsulacionDeConsultas() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("ENC", "Encapsulado", "enc@demo.co"), "registro encapsulación");
+        comprobar(sistema.crearBilleteraAUsuario("ENC", 1500, "Cuenta", TipoBilletera.AHORRO, 10_000),
+                "billetera encapsulación");
+        comprobar(sistema.realizarRecarga(1500, 1_000, "ENC"), "recarga encapsulación");
+
+        Usuario usuarioExterno = sistema.buscarUsuario("ENC");
+        usuarioExterno.agregarPuntos(50_000);
+        usuarioExterno.setActivo(false);
+        Billetera billeteraExterna = usuarioExterno.getBilleteras().getNodeValue(0);
+        billeteraExterna.recargar(5_000);
+        billeteraExterna.setActivo(false);
+        Transaccion transaccionExterna = sistema.obtenerHistorialGlobal().getNodeValue(0);
+        transaccionExterna.marcarRevertida();
+
+        comprobar(sistema.buscarUsuario("ENC").getPuntosAcumulados() == 10,
+                "la copia de usuario no modifica los puntos reales");
+        comprobar(sistema.buscarUsuario("ENC").isActivo(), "la copia no puede dar de baja al usuario");
+        comprobar(sistema.buscarBilletera(1500).getSaldo() == 11_000,
+                "la copia de billetera no modifica el saldo real");
+        comprobar(sistema.buscarBilletera(1500).isActivo(), "la copia no puede desactivar la billetera real");
+        comprobar(Transaccion.EXITOSA.equals(sistema.obtenerHistorialGlobal().getNodeValue(0).getEstado()),
+                "la copia de transacción no modifica el estado real");
+
+        Transaccion transaccionAnalitica = sistema.getAnalitica().obtenerTransaccionesMayorValor(1).getNodeValue(0);
+        transaccionAnalitica.marcarRevertida();
+        comprobar(Transaccion.EXITOSA.equals(sistema.obtenerHistorialGlobal().getNodeValue(0).getEstado()),
+                "analítica entrega transacciones defensivas");
+
+        Usuario usuarioAnalitica = sistema.getAnalitica().obtenerUsuariosOrdenadosPorPuntos().getNodeValue(0);
+        usuarioAnalitica.agregarPuntos(100);
+        comprobar(sistema.buscarUsuario("ENC").getPuntosAcumulados() == 10,
+                "analítica entrega usuarios defensivos");
+    }
+
+    private static void probarRechazosYCancelacionProgramada() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("REJ", "Rechazos", "rechazos@demo.co"), "registro rechazos");
+        comprobar(sistema.crearBilleteraAUsuario("REJ", 1600, "Cuenta", TipoBilletera.AHORRO, 1_000),
+                "billetera rechazos");
+        comprobar(!sistema.realizarRetiro(1600, 2_000, "REJ"), "retiro sin saldo rechazado");
+        SimpleLinkedList<Transaccion> historial = sistema.obtenerHistorialGlobal();
+        comprobar(historial.getSize() == 1, "rechazo válido queda en el historial global");
+        comprobar(Transaccion.RECHAZADA.equals(historial.getNodeValue(0).getEstado()),
+                "rechazo conserva estado RECHAZADA");
+        comprobar(sistema.buscarBilletera(1600).getSaldo() == 1_000, "rechazo no altera saldo");
+        comprobar(sistema.buscarUsuario("REJ").getPuntosAcumulados() == 0, "rechazo no genera puntos");
+        comprobar(!sistema.revertirUltimaOperacion(), "una operación rechazada no entra a la pila de reversión");
+
+        LocalDateTime fecha = LocalDateTime.of(2031, 4, 1, 9, 0);
+        comprobar(sistema.programarOperacion("CANCEL-1", 100, 1600, 0, fecha,
+                TipoTransaccion.RETIRO, Frecuencia.UNICA, "PENDIENTE"), "programa operación cancelable");
+        comprobar(!sistema.cancelarOperacionProgramada("OTRO", "CANCEL-1"),
+                "otro usuario no puede cancelar la programación");
+        comprobar(sistema.cancelarOperacionProgramada("REJ", "CANCEL-1"),
+                "el dueño puede cancelar su programación");
+        comprobar(sistema.getCantidadOperacionesProgramadasPendientes() == 0,
+                "cancelación retira la operación de la cola de prioridad");
+        SimpleLinkedList<OperacionProgramada> procesadas = sistema.obtenerOperacionesProcesadas();
+        comprobar(OperacionProgramada.CANCELADA_POR_USUARIO.equals(
+                        procesadas.getNodeValue(procesadas.getSize() - 1).getEstado()),
+                "cancelación queda registrada en el historial");
+    }
+
+    private static void probarRecurrenciaMensual() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("MES", "Mensual", "mensual@demo.co"), "registro mensual");
+        comprobar(sistema.crearBilleteraAUsuario("MES", 1700, "Cuenta", TipoBilletera.AHORRO, 0),
+                "billetera mensual");
+        LocalDateTime enero = LocalDateTime.of(2032, 1, 31, 8, 30);
+        comprobar(sistema.programarOperacion("MENSUAL-1", 100, 1700, 0, enero,
+                TipoTransaccion.RECARGA, Frecuencia.MENSUAL, "PENDIENTE"), "programación mensual día 31");
+        comprobar(sistema.procesarOperacionesProgramadas(enero) == 1, "primera ejecución mensual");
+        LocalDateTime febrero = sistema.obtenerOperacionesPendientes().getNodeValue(0).getFechaHora();
+        comprobar(febrero.equals(LocalDateTime.of(2032, 2, 29, 8, 30)),
+                "febrero bisiesto ajusta al último día sin perder ancla");
+        comprobar(sistema.procesarOperacionesProgramadas(febrero) == 1, "segunda ejecución mensual");
+        LocalDateTime marzo = sistema.obtenerOperacionesPendientes().getNodeValue(0).getFechaHora();
+        comprobar(marzo.equals(LocalDateTime.of(2032, 3, 31, 8, 30)),
+                "marzo recupera el día 31 original después de febrero");
+        LocalDateTime siguienteDespuesDeAnios = sistema.obtenerOperacionesPendientes().getNodeValue(0)
+                .calcularSiguienteFechaPosteriorA(LocalDateTime.of(2040, 6, 1, 0, 0));
+        comprobar(siguienteDespuesDeAnios.equals(LocalDateTime.of(2040, 6, 30, 8, 30)),
+                "recurrencia mensual salta fechas vencidas sin iterar mes a mes");
+    }
+
+    private static void probarActualizacionesAtomicas() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("UPD", "Nombre Original", "original@demo.co"), "registro actualización");
+        comprobar(!sistema.modificarUsuario("UPD", "Nombre Nuevo", "correo-inválido"),
+                "modificación rechaza correo inválido");
+        Usuario usuario = sistema.buscarUsuario("UPD");
+        comprobar("Nombre Original".equals(usuario.getNombre())
+                        && "original@demo.co".equals(usuario.getCorreo()),
+                "modificación fallida no deja cambios parciales");
+        comprobar(sistema.crearBilleteraAUsuario("UPD", 1800, "Cuenta", TipoBilletera.AHORRO, 500),
+                "billetera actualización");
+        comprobar(sistema.realizarRecarga(1800, 100, "UPD"), "transacción para fijar categoría");
+        comprobar(!sistema.modificarBilletera("UPD", 1800, "Cuenta nueva", TipoBilletera.TRANSPORTE),
+                "cambio de categoría no reescribe analítica histórica");
+        comprobar(sistema.modificarBilletera("UPD", 1800, "Cuenta nueva", TipoBilletera.AHORRO),
+                "nombre de billetera sí se puede modificar");
+    }
+
+
+    private static void probarCatalogoYFlujoCompletoDeCanjes() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("BEN-A", "Beneficiario", "ben-a@demo.co"), "registro beneficiario");
+        comprobar(sistema.registrarUsuario("BEN-B", "Otro usuario", "ben-b@demo.co"), "registro segundo beneficiario");
+        comprobar(sistema.crearBilleteraAUsuario("BEN-A", 1901, "Principal", TipoBilletera.AHORRO, 0),
+                "billetera beneficiario");
+        comprobar(sistema.realizarRecarga(1901, 30_000, "BEN-A"), "generación de puntos para canje");
+
+        comprobar(sistema.registrarBeneficio(" ben-extra ", "Bono extra", "Recompensa de prueba", 200),
+                "registrar beneficio normalizando id");
+        comprobar(!sistema.registrarBeneficio("BEN-EXTRA", "Duplicado", "No debe registrarse", 100),
+                "rechazar id de beneficio duplicado sin distinguir mayúsculas");
+        comprobar(!sistema.registrarBeneficio("BEN-MAL", "Costo inválido", "Descripción", 0),
+                "rechazar costo de beneficio no positivo");
+        comprobar("Bono extra".equals(sistema.buscarBeneficio(" ben-extra ").getNombre()),
+                "búsqueda de beneficio normaliza identificador");
+
+        CanjeBeneficio canje = sistema.canjearBeneficio("BEN-A", "ben-extra");
+        comprobar(canje != null, "crear comprobante de canje");
+        comprobar("DISPONIBLE".equals(canje.getEstado()), "canje inicia disponible");
+        comprobar(canje.getPuntosGastados() == 200, "comprobante conserva puntos gastados");
+        comprobar(sistema.buscarUsuario("BEN-A").getPuntosAcumulados() == 100,
+                "el canje descuenta exactamente los puntos");
+        comprobar(sistema.obtenerHistorialCanjes().getSize() == 1, "historial global de canjes");
+        comprobar(sistema.obtenerHistorialCanjesUsuario("BEN-A").getSize() == 1,
+                "historial individual de canjes");
+        comprobar(sistema.obtenerCanjesDisponiblesUsuario("BEN-A").getSize() == 1,
+                "consulta canjes todavía disponibles");
+        comprobar(sistema.buscarCanjeBeneficio(canje.getCodigoRedencion()) != null,
+                "búsqueda por código de redención");
+
+        comprobar(sistema.modificarBeneficio("BEN-EXTRA", "Bono editado", "Descripción nueva", 250),
+                "modificar beneficio activo");
+        comprobar("Bono extra".equals(sistema.buscarCanjeBeneficio(canje.getId()).getNombreBeneficio()),
+                "el comprobante conserva la fotografía histórica del beneficio");
+        comprobar(sistema.desactivarBeneficio("BEN-EXTRA"), "desactivar beneficio");
+        comprobar(!sistema.desactivarBeneficio("BEN-EXTRA"), "no repetir desactivación");
+        comprobar(!sistema.obtenerBeneficiosDisponibles().isEmpty(), "catálogo conserva los beneficios de ejemplo activos");
+        comprobar(sistema.activarBeneficio("BEN-EXTRA"), "reactivar beneficio");
+        comprobar(!sistema.activarBeneficio("BEN-EXTRA"), "no repetir activación");
+
+        comprobar(!sistema.utilizarCanjeBeneficio("BEN-B", canje.getCodigoRedencion()),
+                "otro usuario no puede utilizar el canje ajeno");
+        comprobar(sistema.utilizarCanjeBeneficio("BEN-A", canje.getCodigoRedencion()),
+                "el propietario puede utilizar su canje");
+        comprobar(!sistema.utilizarCanjeBeneficio("BEN-A", canje.getCodigoRedencion()),
+                "no se permite utilizar dos veces el mismo canje");
+        comprobar(sistema.buscarCanjeBeneficio(canje.getId()).isUtilizado(),
+                "estado utilizado se conserva en el registro global");
+        comprobar(sistema.obtenerCanjesDisponiblesUsuario("BEN-A").isEmpty(),
+                "canje utilizado deja de aparecer entre los disponibles");
+
+        int alertasCanje = 0;
+        for (Alerta alerta : sistema.obtenerHistorialAlertasUsuario("BEN-A")) {
+            if (alerta.getTipoAlerta().equals("CANJE_BENEFICIO")
+                    || alerta.getTipoAlerta().equals("BENEFICIO_UTILIZADO")) alertasCanje++;
+        }
+        comprobar(alertasCanje == 2, "canje y utilización generan notificaciones en historial del usuario");
+
+        CanjeBeneficio copia = sistema.buscarCanjeBeneficio(canje.getId());
+        comprobar(!copia.marcarComoUtilizado(), "copias de canje ya utilizado no alteran ni reabren su estado");
+    }
+
+    private static void probarUmbralesDeNivelesYPuntosPorTipo() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("NIV", "Niveles", "niveles@demo.co"), "registro niveles");
+        comprobar(sistema.crearBilleteraAUsuario("NIV", 2001, "Principal", TipoBilletera.AHORRO, 0),
+                "billetera niveles");
+        comprobar(sistema.realizarRecarga(2001, 50_000, "NIV"), "recarga para llegar a 500 puntos");
+        comprobar(sistema.buscarUsuario("NIV").getPuntosAcumulados() == 500
+                        && "Bronce".equals(sistema.buscarUsuario("NIV").getNivel()),
+                "500 puntos pertenece a Bronce");
+        comprobar(sistema.realizarRecarga(2001, 100, "NIV"), "recarga para llegar a 501 puntos");
+        comprobar("Plata".equals(sistema.buscarUsuario("NIV").getNivel()), "501 puntos pertenece a Plata");
+        comprobar(sistema.realizarRecarga(2001, 49_900, "NIV"), "recarga para llegar a 1000 puntos");
+        comprobar("Plata".equals(sistema.buscarUsuario("NIV").getNivel()), "1000 puntos pertenece a Plata");
+        comprobar(sistema.realizarRecarga(2001, 100, "NIV"), "recarga para llegar a 1001 puntos");
+        comprobar("Oro".equals(sistema.buscarUsuario("NIV").getNivel()), "1001 puntos pertenece a Oro");
+        comprobar(sistema.realizarRecarga(2001, 400_000, "NIV"), "recarga para llegar a 5001 puntos");
+        comprobar("Platino".equals(sistema.buscarUsuario("NIV").getNivel()), "5001 puntos pertenece a Platino");
+        comprobar(sistema.getAnalitica().obtenerUsuariosPorNivel("platino").getSize() == 1,
+                "consulta de usuario por nivel coincide con los umbrales");
+
+        FintechController puntos = new FintechController();
+        comprobar(puntos.registrarUsuario("PTS", "Puntos", "puntos@demo.co"), "registro puntos por tipo");
+        comprobar(puntos.registrarUsuario("DEST", "Destino", "dest@demo.co"), "registro destinatario puntos");
+        comprobar(puntos.crearBilleteraAUsuario("PTS", 2010, "Origen", TipoBilletera.AHORRO, 20_000),
+                "origen puntos por tipo");
+        comprobar(puntos.crearBilleteraAUsuario("DEST", 2011, "Destino", TipoBilletera.AHORRO, 0),
+                "destino puntos por tipo");
+        comprobar(puntos.realizarRecarga(2010, 1_000, "PTS"), "recarga puntuable");
+        comprobar(puntos.buscarUsuario("PTS").getPuntosAcumulados() == 10, "recarga suma un punto por cada 100");
+        comprobar(puntos.realizarRetiro(2010, 1_000, "PTS"), "retiro puntuable");
+        comprobar(puntos.buscarUsuario("PTS").getPuntosAcumulados() == 30, "retiro suma dos puntos por cada 100");
+        comprobar(puntos.realizarTransferencia(2010, 2011, 1_000, "PTS"), "transferencia puntuable");
+        comprobar(puntos.buscarUsuario("PTS").getPuntosAcumulados() == 60,
+                "transferencia suma tres puntos por cada 100");
+    }
+
+    private static void probarFechaRealDeEjecucionProgramada() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("TIME", "Fecha", "fecha@demo.co"), "registro fecha programada");
+        comprobar(sistema.crearBilleteraAUsuario("TIME", 2101, "Cuenta", TipoBilletera.AHORRO, 0),
+                "billetera fecha programada");
+        LocalDateTime prevista = LocalDateTime.of(2035, 6, 15, 10, 30);
+        comprobar(sistema.programarOperacion("TIME-1", 1_000, 2101, 0, prevista,
+                TipoTransaccion.RECARGA, Frecuencia.UNICA, "PENDIENTE"), "programar recarga con fecha controlada");
+        comprobar(sistema.procesarOperacionesProgramadas(prevista) == 1, "procesar en fecha controlada");
+        Transaccion transaccion = sistema.buscarTransaccion("TX-1");
+        comprobar(transaccion != null && prevista.equals(transaccion.getFechaHora()),
+                "transacción programada conserva la fecha efectiva de ejecución simulada");
+        comprobar(transaccion.getPuntosGenerados() == 20,
+                "operación programada añade el bono de 10 puntos al cálculo base");
+        comprobar(sistema.obtenerHistorialAlertasUsuario("TIME").isEmpty(),
+                "recarga normal no inventa alerta de saldo bajo");
+    }
+
+    private static void probarConsultasDeLaFachada() {
+        FintechController sistema = new FintechController();
+        comprobar(sistema.registrarUsuario("FACA", "Fachada A", "faca@demo.co"), "registro fachada A");
+        comprobar(sistema.registrarUsuario("FACB", "Fachada B", "facb@demo.co"), "registro fachada B");
+        comprobar(sistema.crearBilleteraAUsuario("FACA", 2201, "Cuenta A", TipoBilletera.AHORRO, 5_000),
+                "billetera fachada A");
+        comprobar(sistema.crearBilleteraAUsuario("FACB", 2202, "Cuenta B", TipoBilletera.AHORRO, 0),
+                "billetera fachada B");
+        comprobar(sistema.realizarTransferencia(2201, 2202, 500, "FACA"), "transferencia para consultas fachada");
+        comprobar(sistema.obtenerUsuarios().getSize() == 2, "lista de usuarios activos desde fachada");
+        comprobar(sistema.obtenerBilleterasUsuario("FACA").getSize() == 1, "billeteras de usuario desde fachada");
+        comprobar(sistema.obtenerHistorialTransaccionesUsuario("FACA").getSize() == 1,
+                "historial de transacciones por usuario desde fachada");
+        comprobar(sistema.obtenerHistorialTransaccionesUsuario("FACB").getSize() == 1,
+                "historial receptor de transferencia desde fachada");
+        comprobar(sistema.obtenerHistorialTransaccionesBilletera(2201).getSize() == 1,
+                "historial por billetera desde fachada");
+        comprobar(sistema.buscarTransaccion(" tx-1 ") != null, "búsqueda de transacción no distingue mayúsculas");
+
+        Usuario copia = sistema.obtenerUsuarios().getNodeValue(0);
+        copia.agregarPuntos(99);
+        comprobar(sistema.buscarUsuario("FACA").getPuntosAcumulados() == 15,
+                "la lista de usuarios de fachada solo entrega copias");
+        comprobar(sistema.eliminarUsuario("FACB"), "baja lógica para consultar historial histórico");
+        comprobar(sistema.obtenerUsuarios().getSize() == 1, "la lista de usuarios solo contiene activos");
+        comprobar(sistema.obtenerHistorialTransaccionesUsuario("FACB").getSize() == 1,
+                "historial permanece disponible tras la baja lógica");
+    }
+
+
+    private static void probarDatosDeDemostracionIntegrados() {
+        FintechController sistema = new FintechController();
+        comprobar(co.edu.uniquindio.proyectofinal.vistas.DatosDemo.cargar(sistema),
+                "carga de datos de demostración");
+        comprobar(sistema.obtenerUsuarios().getSize() == 4, "demo registra cuatro usuarios");
+        comprobar(sistema.obtenerOperacionesPendientes().getSize() == 2,
+                "demo conserva las dos operaciones programadas");
+        comprobar(!co.edu.uniquindio.proyectofinal.vistas.DatosDemo.cargar(sistema),
+                "la carga demo no duplica usuarios ni operaciones");
+
+        int ejecutadas = sistema.procesarOperacionesProgramadas(LocalDateTime.now().plusMinutes(1));
+        comprobar(ejecutadas == 1, "demo procesa solamente la operación vencida");
+        comprobar(sistema.obtenerOperacionesProcesadas().getSize() == 1,
+                "demo archiva la operación única procesada");
+        comprobar(sistema.obtenerOperacionesPendientes().getSize() == 1,
+                "demo conserva el ahorro semanal futuro");
+        comprobar(sistema.buscarBilletera(401).getSaldo() == 110_000,
+                "recarga programada demo modifica el saldo correctamente");
     }
 
     private static void comprobar(boolean condicion, String nombre) {

@@ -1,6 +1,7 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos;
 
 import java.util.Objects;
+import java.util.Locale;
 
 /**
  * Elemento del catálogo que puede ser canjeado con puntos de fidelización.
@@ -41,7 +42,7 @@ public class Beneficio {
     }
 
     private static String normalizarId(String id) {
-        return validarTexto(id, "El identificador").toUpperCase();
+        return validarTexto(id, "El identificador").toUpperCase(Locale.ROOT);
     }
 
     private static String validarTexto(String texto, String campo) {

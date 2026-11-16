@@ -76,10 +76,14 @@ public class Grafo<T> {
          *
          * @return lista de adyacencia del vértice.
          *
-         * Complejidad temporal: O(1).
+         * Complejidad temporal: O(A), porque genera una copia defensiva de las aristas.
          */
         public SimpleLinkedList<Arista<T>> getAdyacentes() {
-            return adyacentes;
+            SimpleLinkedList<Arista<T>> copia = new SimpleLinkedList<>();
+            for (Arista<T> arista : adyacentes) {
+                copia.addLast(new Arista<>(arista.destino, arista.peso));
+            }
+            return copia;
         }
     }
 
@@ -106,7 +110,7 @@ public class Grafo<T> {
          * @param destino vértice al que apunta la arista.
          * @param peso valor numérico asociado a la conexión.
          * @throws IllegalArgumentException si el destino es null
-         * o el peso es negativo, NaN o infinito.
+         * o el peso no es positivo, NaN o infinito.
          */
         public Arista(Vertice<T> destino, double peso) {
 
@@ -148,7 +152,7 @@ public class Grafo<T> {
          * Actualiza el peso de la arista.
          *
          * @param peso nuevo peso de la conexión.
-         * @throws IllegalArgumentException si el peso es negativo,
+         * @throws IllegalArgumentException si el peso no es positivo,
          * NaN o infinito.
          */
         public void setPeso(double peso) {
@@ -164,9 +168,9 @@ public class Grafo<T> {
          */
         private static void validarPeso(double peso) {
 
-            if (!Double.isFinite(peso) || peso < 0) {
+            if (!Double.isFinite(peso) || peso <= 0) {
                 throw new IllegalArgumentException(
-                        "El peso debe ser un número finito y no negativo."
+                        "El peso debe ser un número finito y positivo."
                 );
             }
         }
@@ -246,7 +250,7 @@ public class Grafo<T> {
      * @param destino dato del vértice de destino.
      * @param peso peso que se agregará a la conexión.
      * @throws IllegalArgumentException si algún dato es null,
-     * el peso es negativo o no es finito.
+     * el peso no es positivo o no es finito.
      *
      * Complejidad temporal: O(V + A), donde A es la cantidad de
      * aristas salientes del vértice de origen.
@@ -264,10 +268,7 @@ public class Grafo<T> {
             return;
         }
 
-        Arista<T> aristaExistente = buscarArista(
-                verticeOrigen,
-                destino
-        );
+        Arista<T> aristaExistente = buscarArista(verticeOrigen, destino);
 
         if (aristaExistente != null) {
 
@@ -279,9 +280,9 @@ public class Grafo<T> {
             return;
         }
 
-        verticeOrigen.getAdyacentes().addLast(
-                new Arista<>(verticeDestino, peso)
-        );
+        // El acceso público devuelve una copia defensiva; la inserción debe hacerse
+        // sobre la lista interna del vértice desde la propia clase Grafo.
+        verticeOrigen.adyacentes.addLast(new Arista<>(verticeDestino, peso));
     }
 
     /**
@@ -296,7 +297,8 @@ public class Grafo<T> {
      */
     private Arista<T> buscarArista(Vertice<T> origen, T destino) {
 
-        for (Arista<T> arista : origen.getAdyacentes()) {
+        // Acceso directo interno: getAdyacentes() entrega copias defensivas.
+        for (Arista<T> arista : origen.adyacentes) {
             if (Objects.equals(arista.getDestino().getDato(), destino)) {
                 return arista;
             }
@@ -396,10 +398,10 @@ public class Grafo<T> {
             return false;
         }
 
-        for (Arista<T> arista : verticeOrigen.getAdyacentes()) {
+        for (Arista<T> arista : verticeOrigen.adyacentes) {
             if (Objects.equals(arista.getDestino().getDato(), destino)) {
-                // Se elimina y se retorna inmediatamente; el iterador no vuelve a avanzar.
-                verticeOrigen.getAdyacentes().remove(arista);
+                // Se elimina de la lista real y se retorna inmediatamente.
+                verticeOrigen.adyacentes.remove(arista);
                 return true;
             }
         }
@@ -415,10 +417,13 @@ public class Grafo<T> {
      *
      * @return lista de vértices del grafo.
      *
-     * Complejidad temporal: O(1).
+     * Complejidad temporal: O(V), porque crea una lista defensiva de vértices.
      */
     public SimpleLinkedList<Vertice<T>> getVertices() {
-        return vertices;
+        // Los vértices se pueden consultar, pero la colección interna no se expone.
+        SimpleLinkedList<Vertice<T>> copia = new SimpleLinkedList<>();
+        for (Vertice<T> vertice : vertices) copia.addLast(vertice);
+        return copia;
     }
 
     /**
@@ -436,7 +441,7 @@ public class Grafo<T> {
     public int contarAristasActivas(Vertice<T> vertice) {
         if (vertice == null) return 0;
         int cantidad = 0;
-        for (Arista<T> arista : vertice.getAdyacentes()) {
+        for (Arista<T> arista : vertice.adyacentes) {
             if (arista.getPeso() > 0) cantidad++;
         }
         return cantidad;

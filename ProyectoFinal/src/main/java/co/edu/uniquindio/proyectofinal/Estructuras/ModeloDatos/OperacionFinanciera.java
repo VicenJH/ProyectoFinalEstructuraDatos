@@ -2,12 +2,7 @@ package co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos;
 
 import java.time.LocalDateTime;
 
-/**
- * Datos comunes de una operación financiera. La identidad, el monto, las
- * billeteras y el tipo quedan inmutables después de crear la operación.
- * Solo las subclases pueden modificar estado y fecha cuando su ciclo de vida
- * lo requiere (reversión o reprogramación).
- */
+/** Datos comunes e invariantes de una operación financiera. */
 public abstract class OperacionFinanciera {
 
     private final String id;
@@ -22,22 +17,24 @@ public abstract class OperacionFinanciera {
                                String billeteraDestino, LocalDateTime fechaHora,
                                TipoTransaccion tipo, String estado) {
         this.id = validarTexto(id, "El identificador");
-        if (!Double.isFinite(valor) || valor <= 0) {
-            throw new IllegalArgumentException("El valor de la operación debe ser positivo y finito.");
+        if (!Double.isFinite(valor) || valor <= 0 || valor != Math.rint(valor)
+                || valor > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("El valor debe ser un monto entero positivo representable.");
         }
         if (fechaHora == null) throw new IllegalArgumentException("La fecha y hora no pueden ser null.");
         if (tipo == null) throw new IllegalArgumentException("El tipo de transacción no puede ser null.");
         this.valor = valor;
         this.billeteraOrigen = validarTexto(billeteraOrigen, "La billetera de origen");
-        if (billeteraDestino != null && billeteraDestino.trim().isEmpty()) {
-            throw new IllegalArgumentException("La billetera de destino no puede estar vacía.");
-        }
         boolean esTransferencia = tipo == TipoTransaccion.TRANSFERENCIA_INTERNA
                 || tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA;
-        if (esTransferencia && billeteraDestino == null) {
-            throw new IllegalArgumentException("Una transferencia debe indicar la billetera de destino.");
+        if (esTransferencia) {
+            this.billeteraDestino = validarTexto(billeteraDestino, "La billetera de destino");
+        } else {
+            if (billeteraDestino != null && !billeteraDestino.trim().isEmpty()) {
+                throw new IllegalArgumentException("Una recarga o retiro no debe tener billetera destino.");
+            }
+            this.billeteraDestino = null;
         }
-        this.billeteraDestino = billeteraDestino == null ? null : billeteraDestino.trim();
         this.fechaHora = fechaHora;
         this.tipo = tipo;
         this.estado = validarTexto(estado, "El estado");

@@ -49,6 +49,9 @@ public class TablaHash<K, V> {
 
     /** Inserta una nueva entrada o reemplaza el valor de una clave existente. */
     public void insertar(K clave, V valor) {
+        if (valor == null) {
+            throw new IllegalArgumentException("El valor asociado a una clave no puede ser null.");
+        }
         int indice = obtenerIndice(clave);
         Entrada<K, V> actual = tabla[indice];
 
@@ -61,7 +64,13 @@ public class TablaHash<K, V> {
         }
 
         if ((double) (tamano + 1) / capacidad > FACTOR_CARGA_MAXIMO) {
-            redimensionar(Math.multiplyExact(capacidad, 2));
+            final int nuevaCapacidad;
+            try {
+                nuevaCapacidad = Math.multiplyExact(capacidad, 2);
+            } catch (ArithmeticException ex) {
+                throw new IllegalStateException("La tabla hash alcanzó su capacidad máxima.", ex);
+            }
+            redimensionar(nuevaCapacidad);
             indice = obtenerIndice(clave);
         }
 
@@ -119,6 +128,9 @@ public class TablaHash<K, V> {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void redimensionar(int nuevaCapacidad) {
+        if (nuevaCapacidad <= capacidad) {
+            throw new IllegalArgumentException("La nueva capacidad debe ser mayor que la actual.");
+        }
         Entrada<K, V>[] anterior = tabla;
         tabla = (Entrada<K, V>[]) new Entrada[nuevaCapacidad];
         int capacidadAnterior = capacidad;

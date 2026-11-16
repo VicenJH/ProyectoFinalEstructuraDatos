@@ -53,7 +53,7 @@ public final class DatosDemo {
         c.programarOperacion("PRG-001", 20000, 101, 102,
                 LocalDateTime.now().plusDays(1), TipoTransaccion.TRANSFERENCIA_INTERNA,
                 Frecuencia.SEMANAL, "PENDIENTE");
-        c.programarOperacion("PRG-002", 5000, 401, 401,
+        c.programarOperacion("PRG-002", 5000, 401, 0,
                 LocalDateTime.now().minusHours(1), TipoTransaccion.RECARGA,
                 Frecuencia.UNICA, "PENDIENTE");
 

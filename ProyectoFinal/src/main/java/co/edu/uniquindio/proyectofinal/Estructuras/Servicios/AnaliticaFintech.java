@@ -40,7 +40,7 @@ public class AnaliticaFintech {
         }
 
         private void registrar(long monto) {
-            veces++;
+            if (veces < Integer.MAX_VALUE) veces++;
             montoTotal = montoTotal > Long.MAX_VALUE - monto ? Long.MAX_VALUE : montoTotal + monto;
         }
 
@@ -109,7 +109,7 @@ public class AnaliticaFintech {
 
         for (Transaccion t : historialGlobal) {
             if (enPeriodo(t, desde, hasta)) {
-                resultado.addLast(t);
+                resultado.addLast(t.copia());
             }
         }
 
@@ -124,7 +124,8 @@ public class AnaliticaFintech {
 
         for (Transaccion t : historialGlobal) {
             if (exitosa(t) && enPeriodo(t, desde, hasta)) {
-                total += (long) t.getValor();
+                long monto = (long) t.getValor();
+                total = total > Long.MAX_VALUE - monto ? Long.MAX_VALUE : total + monto;
             }
         }
 
@@ -141,7 +142,9 @@ public class AnaliticaFintech {
 
         for (Transaccion t : historialGlobal) {
             if (exitosa(t)) {
-                frecuencias[t.getTipo().ordinal()]++;
+                if (frecuencias[t.getTipo().ordinal()] < Integer.MAX_VALUE) {
+                    frecuencias[t.getTipo().ordinal()]++;
+                }
             }
         }
 
@@ -161,7 +164,7 @@ public class AnaliticaFintech {
                 long usos = 0;
 
                 for (Transaccion t : billetera.getHistorialTransacciones()) {
-                    if (exitosa(t)) {
+                    if (exitosa(t) && usos < Long.MAX_VALUE) {
                         usos++;
                     }
                 }
@@ -191,7 +194,10 @@ public class AnaliticaFintech {
             }
         }
 
-        return elementos(mayores(conteos, n));
+        SimpleLinkedList<Transaccion> seleccionadas = elementos(mayores(conteos, n));
+        SimpleLinkedList<Transaccion> resultado = new SimpleLinkedList<>();
+        for (Transaccion transaccion : seleccionadas) resultado.addLast(transaccion.copia());
+        return resultado;
     }
 
     /** @return los N usuarios con más transferencias realizadas. */
@@ -299,8 +305,8 @@ public class AnaliticaFintech {
 
     /**
      * Detecta ciclos de transferencias (ej. A → B → C → A) con un DFS.
-     * Informa un ciclo por cada arista de retorno encontrada. Las aristas
-     * con peso 0 (transferencias revertidas) se ignoran.
+     * Informa un ciclo por cada arista de retorno encontrada. Las transferencias
+     * revertidas se retiran del grafo y, por tanto, no participan en el recorrido.
      *
      * Complejidad: O(V + A).
      *
@@ -374,7 +380,11 @@ public class AnaliticaFintech {
             throw new IllegalArgumentException("El mínimo no puede ser mayor que el máximo.");
         }
 
-        return arbolPuntos.buscarPorRango(Usuario::getPuntosAcumulados, min, max);
+        SimpleLinkedList<Usuario> encontrados = arbolPuntos.buscarPorRango(
+                Usuario::getPuntosAcumulados, min, max);
+        SimpleLinkedList<Usuario> resultado = new SimpleLinkedList<>();
+        for (Usuario usuario : encontrados) resultado.addLast(usuario.copia());
+        return resultado;
     }
 
     /** @return todos los usuarios de menor a mayor puntaje (recorrido inorden). */
@@ -391,7 +401,7 @@ public class AnaliticaFintech {
             throw new IllegalArgumentException("El nivel no puede ser null.");
         }
 
-        switch (nivel.trim().toLowerCase()) {
+        switch (nivel.trim().toLowerCase(java.util.Locale.ROOT)) {
             case "bronce":
                 return buscarUsuariosPorRangoDePuntos(0, 500);
             case "plata":
@@ -411,7 +421,7 @@ public class AnaliticaFintech {
 
     private SimpleLinkedList<Conteo<Usuario>> contarPorUsuario(LocalDateTime desde, LocalDateTime hasta,
                                                                boolean soloTransferencias) {
-        TablaHash<String, Integer> conteos = new TablaHash<>(101);
+        TablaHash<String, Long> conteos = new TablaHash<>(101);
 
         for (Transaccion t : historialGlobal) {
             if (!exitosa(t) || !enPeriodo(t, desde, hasta)
@@ -442,10 +452,10 @@ public class AnaliticaFintech {
         SimpleLinkedList<Conteo<Usuario>> resultado = new SimpleLinkedList<>();
 
         for (Usuario usuario : usuarios) {
-            Integer cantidad = conteos.buscar(usuario.getId());
+            Long cantidad = conteos.buscar(usuario.getId());
 
             if (cantidad != null) {
-                resultado.addLast(new Conteo<>(usuario, cantidad));
+                resultado.addLast(new Conteo<>(usuario.copia(), cantidad));
             }
         }
 
@@ -498,13 +508,15 @@ public class AnaliticaFintech {
         Billetera billetera = billeteras.buscar(Integer.parseInt(codigoBilletera));
 
         if (billetera != null) {
-            movimientos[billetera.getTipo().ordinal()]++;
+            int indice = billetera.getTipo().ordinal();
+            if (movimientos[indice] < Integer.MAX_VALUE) movimientos[indice]++;
         }
     }
 
-    private void incrementarConteo(TablaHash<String, Integer> conteos, String idUsuario) {
-        Integer previo = conteos.buscar(idUsuario);
-        conteos.insertar(idUsuario, previo == null ? 1 : Math.addExact(previo, 1));
+    private void incrementarConteo(TablaHash<String, Long> conteos, String idUsuario) {
+        Long previo = conteos.buscar(idUsuario);
+        long siguiente = previo == null ? 1L : (previo == Long.MAX_VALUE ? Long.MAX_VALUE : previo + 1L);
+        conteos.insertar(idUsuario, siguiente);
     }
 
     private boolean exitosa(Transaccion t) {
