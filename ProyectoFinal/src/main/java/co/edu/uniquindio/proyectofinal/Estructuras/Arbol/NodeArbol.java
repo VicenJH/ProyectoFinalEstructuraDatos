@@ -51,6 +51,9 @@ public class NodeArbol<T> {
      */
     private NodeArbol<T> padre;
 
+    /** Altura del subárbol cuya raíz es este nodo (una hoja tiene altura 1). */
+    private int altura;
+
     /**
      * Construye un nodo con un elemento y un nodo padre.
      *
@@ -67,6 +70,7 @@ public class NodeArbol<T> {
         this.padre = padre;
         this.izquierdo = null;
         this.derecho = null;
+        this.altura = 1;
     }
 
     /**
@@ -106,7 +110,7 @@ public class NodeArbol<T> {
      *
      * Complejidad: O(1).
      */
-    public void setElemento(T elemento) {
+    void setElemento(T elemento) {
         this.elemento = elemento;
     }
 
@@ -132,7 +136,7 @@ public class NodeArbol<T> {
      *
      * Complejidad: O(1).
      */
-    public void setIzquierdo(NodeArbol<T> izquierdo) {
+    void setIzquierdo(NodeArbol<T> izquierdo) {
         this.izquierdo = izquierdo;
     }
 
@@ -158,8 +162,21 @@ public class NodeArbol<T> {
      *
      * Complejidad: O(1).
      */
-    public void setDerecho(NodeArbol<T> derecho) {
+    void setDerecho(NodeArbol<T> derecho) {
         this.derecho = derecho;
+    }
+
+    /** Obtiene la altura almacenada para mantener el balance AVL en O(1). */
+    public int getAltura() {
+        return altura;
+    }
+
+    /** Actualiza la altura del nodo; el cálculo corresponde a ArbolBinario. */
+    void setAltura(int altura) {
+        if (altura < 1) {
+            throw new IllegalArgumentException("La altura de un nodo debe ser positiva.");
+        }
+        this.altura = altura;
     }
 
     /**
@@ -186,7 +203,7 @@ public class NodeArbol<T> {
      *
      * Complejidad: O(1).
      */
-    public void setPadre(NodeArbol<T> padre) {
+    void setPadre(NodeArbol<T> padre) {
         this.padre = padre;
     }
 }

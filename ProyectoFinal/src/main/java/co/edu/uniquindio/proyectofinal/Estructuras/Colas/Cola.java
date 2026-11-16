@@ -1,6 +1,7 @@
 
 package co.edu.uniquindio.proyectofinal.Estructuras.Colas;
 
+import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
@@ -21,7 +22,7 @@ import java.util.Objects;
  *
  * @param <T> tipo de elementos almacenados en la cola.
  */
-public class Cola<T> {
+public class Cola<T> implements Iterable<T> {
 
     /**
      * Cantidad de elementos almacenados.
@@ -308,5 +309,31 @@ public class Cola<T> {
         firstNode = null;
         lastNode = null;
         size = 0;
+    }
+
+    /**
+     * Permite recorrer una copia lógica de la cola en orden FIFO sin modificarla.
+     * Complejidad total del recorrido: O(n).
+     */
+    @Override
+    public Iterator<T> iterator() {
+        return new Iterator<T>() {
+            private NodeSimple<T> actual = firstNode;
+
+            @Override
+            public boolean hasNext() {
+                return actual != null;
+            }
+
+            @Override
+            public T next() {
+                if (actual == null) {
+                    throw new NoSuchElementException();
+                }
+                T dato = actual.getData();
+                actual = actual.getNext();
+                return dato;
+            }
+        };
     }
 }

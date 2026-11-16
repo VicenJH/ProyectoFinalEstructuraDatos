@@ -1,7 +1,6 @@
 package co.edu.uniquindio.proyectofinal.Estructuras.Servicios;
 
 import co.edu.uniquindio.proyectofinal.Estructuras.Arbol.ArbolBinario;
-import co.edu.uniquindio.proyectofinal.Estructuras.Arbol.NodeArbol;
 import co.edu.uniquindio.proyectofinal.Estructuras.Colas.ColaPrioridad;
 import co.edu.uniquindio.proyectofinal.Estructuras.Grafos.Grafo;
 import co.edu.uniquindio.proyectofinal.Estructuras.Hash.TablaHash;
@@ -42,7 +41,7 @@ public class AnaliticaFintech {
 
         private void registrar(long monto) {
             veces++;
-            montoTotal += monto;
+            montoTotal = montoTotal > Long.MAX_VALUE - monto ? Long.MAX_VALUE : montoTotal + monto;
         }
 
         public String getOrigen() {
@@ -275,7 +274,9 @@ public class AnaliticaFintech {
                 continue;
             }
 
-            String clave = origen.getIdUsuario() + "->" + destino.getIdUsuario();
+            String idOrigen = origen.getIdUsuario();
+            String idDestino = destino.getIdUsuario();
+            String clave = idOrigen.length() + ":" + idOrigen + idDestino.length() + ":" + idDestino;
             RutaFrecuente ruta = porClave.buscar(clave);
 
             if (ruta == null) {
@@ -373,9 +374,7 @@ public class AnaliticaFintech {
             throw new IllegalArgumentException("El mínimo no puede ser mayor que el máximo.");
         }
 
-        SimpleLinkedList<Usuario> resultado = new SimpleLinkedList<>();
-        recolectarRango(arbolPuntos.getRaiz(), min, max, resultado);
-        return resultado;
+        return arbolPuntos.buscarPorRango(Usuario::getPuntosAcumulados, min, max);
     }
 
     /** @return todos los usuarios de menor a mayor puntaje (recorrido inorden). */
@@ -406,27 +405,6 @@ public class AnaliticaFintech {
         }
     }
 
-    private void recolectarRango(NodeArbol<Usuario> nodo, int min, int max, SimpleLinkedList<Usuario> resultado) {
-        if (nodo == null) {
-            return;
-        }
-
-        int puntos = nodo.getElemento().getPuntosAcumulados();
-
-        // Con puntos iguales, el desempate por id puede dejar nodos a ambos lados.
-        if (puntos >= min) {
-            recolectarRango(nodo.getIzquierdo(), min, max, resultado);
-        }
-
-        if (puntos >= min && puntos <= max) {
-            resultado.addLast(nodo.getElemento());
-        }
-
-        if (puntos <= max) {
-            recolectarRango(nodo.getDerecho(), min, max, resultado);
-        }
-    }
-
     // ------------------------------------------------------------------
     // AUXILIARES
     // ------------------------------------------------------------------
@@ -447,8 +425,18 @@ public class AnaliticaFintech {
                 continue;
             }
 
-            Integer previo = conteos.buscar(origen.getIdUsuario());
-            conteos.insertar(origen.getIdUsuario(), previo == null ? 1 : previo + 1);
+            incrementarConteo(conteos, origen.getIdUsuario());
+
+            // Para actividad general también se cuenta la participación como receptor
+            // de una transferencia externa. El ranking de transferencias realizadas
+            // (soloTransferencias=true) conserva el criterio de contar al emisor.
+            if (!soloTransferencias && esTransferencia(t) && t.getBilleteraDestino() != null) {
+                Billetera destino = billeteras.buscar(Integer.parseInt(t.getBilleteraDestino()));
+                if (destino != null && destino.getIdUsuario() != null
+                        && !destino.getIdUsuario().equals(origen.getIdUsuario())) {
+                    incrementarConteo(conteos, destino.getIdUsuario());
+                }
+            }
         }
 
         SimpleLinkedList<Conteo<Usuario>> resultado = new SimpleLinkedList<>();
@@ -512,6 +500,11 @@ public class AnaliticaFintech {
         if (billetera != null) {
             movimientos[billetera.getTipo().ordinal()]++;
         }
+    }
+
+    private void incrementarConteo(TablaHash<String, Integer> conteos, String idUsuario) {
+        Integer previo = conteos.buscar(idUsuario);
+        conteos.insertar(idUsuario, previo == null ? 1 : Math.addExact(previo, 1));
     }
 
     private boolean exitosa(Transaccion t) {

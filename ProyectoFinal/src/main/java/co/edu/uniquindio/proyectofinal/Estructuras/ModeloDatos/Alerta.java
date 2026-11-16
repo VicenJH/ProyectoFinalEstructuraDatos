@@ -18,16 +18,16 @@ import java.time.LocalDateTime;
 public class Alerta {
 
     /** Identificador numérico de la alerta. */
-    public int id;
+    private final int id;
 
     /** Fecha y hora de generación. */
-    public LocalDateTime fecha;
+    private final LocalDateTime fecha;
 
     /** Descripción del evento detectado. */
-    public String mensaje;
+    private final String mensaje;
 
     /** Clasificación de la alerta. */
-    public String tipoAlerta;
+    private final String tipoAlerta;
 
     /** Indica si la alerta ya fue revisada. */
     private boolean atendida;
@@ -76,39 +76,9 @@ public class Alerta {
         return id;
     }
 
-    /**
-     * Modifica el identificador.
-     *
-     * @param id nuevo identificador positivo.
-     */
-    public void setId(int id) {
-        if (id <= 0) {
-            throw new IllegalArgumentException(
-                    "El identificador debe ser positivo."
-            );
-        }
-
-        this.id = id;
-    }
-
     /** @return fecha de generación. */
     public LocalDateTime getFecha() {
         return fecha;
-    }
-
-    /**
-     * Modifica la fecha de generación.
-     *
-     * @param fecha nueva fecha.
-     */
-    public void setFecha(LocalDateTime fecha) {
-        if (fecha == null) {
-            throw new IllegalArgumentException(
-                    "La fecha no puede ser null."
-            );
-        }
-
-        this.fecha = fecha;
     }
 
     /** @return mensaje descriptivo. */
@@ -116,29 +86,9 @@ public class Alerta {
         return mensaje;
     }
 
-    /**
-     * Modifica el mensaje.
-     *
-     * @param mensaje nuevo mensaje.
-     */
-    public void setMensaje(String mensaje) {
-        validarTexto(mensaje, "El mensaje");
-        this.mensaje = mensaje;
-    }
-
     /** @return clasificación de la alerta. */
     public String getTipoAlerta() {
         return tipoAlerta;
-    }
-
-    /**
-     * Modifica el tipo de alerta.
-     *
-     * @param tipoAlerta nueva clasificación.
-     */
-    public void setTipoAlerta(String tipoAlerta) {
-        validarTexto(tipoAlerta, "El tipo de alerta");
-        this.tipoAlerta = tipoAlerta;
     }
 
     /** @return true si la alerta fue atendida. */
@@ -151,8 +101,15 @@ public class Alerta {
      *
      * @param atendida nuevo estado.
      */
-    public void setAtendida(boolean atendida) {
-        this.atendida = atendida;
+    public void marcarAtendida() {
+        this.atendida = true;
+    }
+
+    /** Copia independiente para consultas que no deben modificar el historial. */
+    public Alerta copia() {
+        Alerta copia = new Alerta(id, fecha, mensaje, tipoAlerta);
+        if (atendida) copia.marcarAtendida();
+        return copia;
     }
 
     /**

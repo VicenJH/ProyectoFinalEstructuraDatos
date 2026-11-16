@@ -21,28 +21,34 @@ import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.SimpleLinkedList;
 public class Usuario implements Comparable<Usuario> {
 
     /** Identificador único del usuario. */
-    public String id;
+    private final String id;
 
     /** Nombre completo del usuario. */
-    public String nombre;
+    private String nombre;
 
     /** Correo electrónico del usuario. */
-    public String correo;
+    private String correo;
 
     /** Puntos acumulados por operaciones válidas. */
-    public int puntosAcumulados;
+    private int puntosAcumulados;
 
     /** Nivel de fidelización actual. */
-    public String nivel;
+    private String nivel;
 
     /** Billeteras asociadas al usuario. */
-    public SimpleLinkedList<Billetera> billeteras;
+    private SimpleLinkedList<Billetera> billeteras;
 
     /** Historial de transacciones del usuario. */
-    public SimpleLinkedList<Transaccion> historialTransacciones;
+    private SimpleLinkedList<Transaccion> historialTransacciones;
 
     /** Historial de alertas generadas para el usuario. */
-    public SimpleLinkedList<Alerta> historialAlertas;
+    private SimpleLinkedList<Alerta> historialAlertas;
+
+    /** Historial de beneficios canjeados por el usuario. */
+    private SimpleLinkedList<CanjeBeneficio> historialCanjes;
+
+    /** Estado lógico: los usuarios eliminados se conservan para auditoría. */
+    private boolean activo;
 
     /**
      * Construye un usuario nuevo.
@@ -59,15 +65,17 @@ public class Usuario implements Comparable<Usuario> {
         validarTexto(nombre, "El nombre");
         validarTexto(correo, "El correo");
 
-        this.id = id;
-        this.nombre = nombre;
-        this.correo = correo;
+        this.id = id.trim();
+        this.nombre = nombre.trim();
+        this.correo = correo.trim();
         this.puntosAcumulados = 0;
         this.nivel = "Bronce";
 
         this.billeteras = new SimpleLinkedList<>();
         this.historialTransacciones = new SimpleLinkedList<>();
         this.historialAlertas = new SimpleLinkedList<>();
+        this.historialCanjes = new SimpleLinkedList<>();
+        this.activo = true;
     }
 
     /**
@@ -168,11 +176,6 @@ public class Usuario implements Comparable<Usuario> {
         return id;
     }
 
-    /** @param id nuevo identificador. */
-    public void setId(String id) {
-        validarTexto(id, "El identificador");
-        this.id = id;
-    }
 
     /** @return nombre del usuario. */
     public String getNombre() {
@@ -182,7 +185,7 @@ public class Usuario implements Comparable<Usuario> {
     /** @param nombre nuevo nombre. */
     public void setNombre(String nombre) {
         validarTexto(nombre, "El nombre");
-        this.nombre = nombre;
+        this.nombre = nombre.trim();
     }
 
     /** @return correo electrónico. */
@@ -193,7 +196,7 @@ public class Usuario implements Comparable<Usuario> {
     /** @param correo nuevo correo. */
     public void setCorreo(String correo) {
         validarTexto(correo, "El correo");
-        this.correo = correo;
+        this.correo = correo.trim();
     }
 
     /** @return puntos acumulados. */
@@ -201,35 +204,9 @@ public class Usuario implements Comparable<Usuario> {
         return puntosAcumulados;
     }
 
-    /**
-     * Establece los puntos acumulados.
-     *
-     * @param puntosAcumulados nueva cantidad, no negativa.
-     */
-    public void setPuntosAcumulados(int puntosAcumulados) {
-        if (puntosAcumulados < 0) {
-            throw new IllegalArgumentException(
-                    "Los puntos no pueden ser negativos."
-            );
-        }
-
-        this.puntosAcumulados = puntosAcumulados;
-        actualizarNivel();
-    }
-
     /** @return nivel de fidelización. */
     public String getNivel() {
         return nivel;
-    }
-
-    /**
-     * Establece manualmente el nivel.
-     *
-     * @param nivel nuevo nivel.
-     */
-    public void setNivel(String nivel) {
-        validarTexto(nivel, "El nivel");
-        this.nivel = nivel;
     }
 
     /** @return lista de billeteras. */
@@ -245,6 +222,21 @@ public class Usuario implements Comparable<Usuario> {
     /** @return historial de alertas. */
     public SimpleLinkedList<Alerta> getHistorialAlertas() {
         return historialAlertas;
+    }
+
+    /** @return historial de canjes realizados por el usuario. */
+    public SimpleLinkedList<CanjeBeneficio> getHistorialCanjes() {
+        return historialCanjes;
+    }
+
+    /** @return true cuando el usuario puede operar en la plataforma. */
+    public boolean isActivo() {
+        return activo;
+    }
+
+    /** Permite activar o desactivar lógicamente al usuario sin perder su historial. */
+    public void setActivo(boolean activo) {
+        this.activo = activo;
     }
 
     /**

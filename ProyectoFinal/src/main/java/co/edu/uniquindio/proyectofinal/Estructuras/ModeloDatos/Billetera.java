@@ -17,19 +17,19 @@ import co.edu.uniquindio.proyectofinal.Estructuras.SimpleList.SimpleLinkedList;
 public class Billetera {
 
     /** Código único de identificación de la billetera. */
-    public int codigo;
+    private final int codigo;
 
     /** Nombre descriptivo de la billetera (ej. "Ahorro vacaciones"). */
     private String nombre;
 
     /** Categoría de la billetera. */
-    public TipoBilletera tipo;
+    private TipoBilletera tipo;
 
     /** Saldo disponible expresado en unidades enteras. */
-    public int saldo;
+    private int saldo;
 
     /** Indica si la billetera está habilitada para operar. */
-    public boolean activo;
+    private boolean activo;
 
     /** Identificador del usuario dueño de la billetera. */
     private String idUsuario;
@@ -78,8 +78,11 @@ public class Billetera {
         this.nombre = (nombre == null || nombre.trim().isEmpty()) ? tipo.name() : nombre.trim();
         this.tipo = tipo;
         this.saldo = saldo;
+        if (idUsuario != null && idUsuario.trim().isEmpty()) {
+            throw new IllegalArgumentException("El identificador del dueño no puede estar vacío.");
+        }
         this.activo = activo;
-        this.idUsuario = idUsuario;
+        this.idUsuario = idUsuario == null ? null : idUsuario.trim();
         this.historialTransacciones = new SimpleLinkedList<>();
     }
 
@@ -88,12 +91,6 @@ public class Billetera {
         return codigo;
     }
 
-    public void setCodigo(int codigo) {
-        if (codigo <= 0) {
-            throw new IllegalArgumentException("El código debe ser positivo.");
-        }
-        this.codigo = codigo;
-    }
 
     /** @return nombre descriptivo. */
     public String getNombre() {
@@ -124,12 +121,6 @@ public class Billetera {
         return saldo;
     }
 
-    public void setSaldo(int saldo) {
-        if (saldo < 0) {
-            throw new IllegalArgumentException("El saldo no puede ser negativo.");
-        }
-        this.saldo = saldo;
-    }
 
     /** @return true si la billetera está activa. */
     public boolean isActivo() {
@@ -145,9 +136,6 @@ public class Billetera {
         return idUsuario;
     }
 
-    public void setIdUsuario(String idUsuario) {
-        this.idUsuario = idUsuario;
-    }
 
     /** @return historial de transacciones de la billetera. */
     public SimpleLinkedList<Transaccion> getHistorialTransacciones() {

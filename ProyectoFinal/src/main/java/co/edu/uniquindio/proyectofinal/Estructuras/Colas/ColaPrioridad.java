@@ -43,7 +43,7 @@ public class ColaPrioridad<T> {
      * @param comparador criterio de orden; el menor sale primero.
      * @throws IllegalArgumentException si el comparador es null.
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public ColaPrioridad(Comparator<T> comparador) {
         if (comparador == null) {
             throw new IllegalArgumentException("El comparador no puede ser null.");
@@ -142,7 +142,7 @@ public class ColaPrioridad<T> {
         size = 0;
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Entrada<T>[] newHeap(int capacidad) {
         return (Entrada<T>[]) new Entrada[capacidad];
     }

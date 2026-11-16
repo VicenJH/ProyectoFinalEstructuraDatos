@@ -22,6 +22,9 @@ public class OperacionProgramada extends OperacionFinanciera {
     /** Identificador del usuario que solicita la operación. */
     private String idUsuario;
 
+    /** Evita repetir la alerta de proximidad durante una misma ocurrencia. */
+    private boolean notificacionProximaEnviada;
+
     /**
      * Constructor compatible con la versión original.
      *
@@ -95,8 +98,15 @@ public class OperacionProgramada extends OperacionFinanciera {
                 estado
         );
 
-        setFrecuencia(frecuencia);
-        setIdUsuario(idUsuario);
+        if (frecuencia == null) {
+            throw new IllegalArgumentException("La frecuencia no puede ser null.");
+        }
+        if (idUsuario != null && idUsuario.trim().isEmpty()) {
+            throw new IllegalArgumentException("El identificador del usuario no puede estar vacío.");
+        }
+        this.frecuencia = frecuencia;
+        this.idUsuario = idUsuario == null ? null : idUsuario.trim();
+        this.notificacionProximaEnviada = false;
     }
 
     /**
@@ -146,6 +156,24 @@ public class OperacionProgramada extends OperacionFinanciera {
             );
         }
 
-        this.idUsuario = idUsuario;
+        this.idUsuario = idUsuario == null ? null : idUsuario.trim();
+    }
+
+    /** Actualiza la fecha de la siguiente ocurrencia de la programación. */
+    public void reprogramar(LocalDateTime fechaHora) {
+        cambiarFechaHora(fechaHora);
+    }
+
+    /** Cambia el estado del ciclo de vida de la programación. */
+    public void actualizarEstado(String estado) {
+        cambiarEstado(estado);
+    }
+
+    public boolean isNotificacionProximaEnviada() {
+        return notificacionProximaEnviada;
+    }
+
+    public void setNotificacionProximaEnviada(boolean enviada) {
+        this.notificacionProximaEnviada = enviada;
     }
 }

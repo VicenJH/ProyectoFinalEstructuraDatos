@@ -13,6 +13,9 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 
 /**
  * Ventana principal de la plataforma Fintech.
@@ -24,6 +27,7 @@ public class App extends Application {
 
     private final FintechController controlador = new FintechController();
     private TabPane pestanas;
+    private Timeline procesadorAutomatico;
 
     @Override
     public void start(Stage escenario) {
@@ -49,6 +53,37 @@ public class App extends Application {
         escenario.setTitle("Fintech - Billeteras digitales");
         escenario.setScene(new Scene(raiz, 1150, 720));
         escenario.show();
+        iniciarProcesamientoAutomatico();
+    }
+
+    /**
+     * Simula el reloj de la plataforma y procesa operaciones vencidas cada segundo.
+     * Timeline ejecuta el callback en el hilo JavaFX, por lo que se pueden refrescar
+     * los paneles sin acceder desde un hilo externo.
+     */
+    private void iniciarProcesamientoAutomatico() {
+        procesadorAutomatico = new Timeline(new KeyFrame(Duration.seconds(1), evento -> {
+            int pendientesAntes = controlador.getCantidadOperacionesProgramadasPendientes();
+            int notificacionesAntes = controlador.getCantidadNotificacionesPendientes();
+            controlador.notificarOperacionesProximas(java.time.LocalDateTime.now());
+            int ejecutadas = controlador.procesarOperacionesProgramadas();
+            int pendientesDespues = controlador.getCantidadOperacionesProgramadasPendientes();
+            int notificacionesDespues = controlador.getCantidadNotificacionesPendientes();
+
+            if (ejecutadas > 0 || pendientesAntes != pendientesDespues
+                    || notificacionesAntes != notificacionesDespues) {
+                refrescarTodo();
+            }
+        }));
+        procesadorAutomatico.setCycleCount(Timeline.INDEFINITE);
+        procesadorAutomatico.play();
+    }
+
+    @Override
+    public void stop() {
+        if (procesadorAutomatico != null) {
+            procesadorAutomatico.stop();
+        }
     }
 
     private void cargarDatosDeEjemplo() {

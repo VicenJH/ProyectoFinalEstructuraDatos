@@ -224,10 +224,7 @@ public class Grafo<T> {
             );
         }
 
-        for (int i = 0; i < vertices.getSize(); i++) {
-
-            Vertice<T> vertice = vertices.getNodeValue(i);
-
+        for (Vertice<T> vertice : vertices) {
             if (Objects.equals(vertice.getDato(), dato)) {
                 return vertice;
             }
@@ -299,10 +296,7 @@ public class Grafo<T> {
      */
     private Arista<T> buscarArista(Vertice<T> origen, T destino) {
 
-        for (int i = 0; i < origen.getAdyacentes().getSize(); i++) {
-
-            Arista<T> arista = origen.getAdyacentes().getNodeValue(i);
-
+        for (Arista<T> arista : origen.getAdyacentes()) {
             if (Objects.equals(arista.getDestino().getDato(), destino)) {
                 return arista;
             }
@@ -402,11 +396,9 @@ public class Grafo<T> {
             return false;
         }
 
-        for (int i = 0; i < verticeOrigen.getAdyacentes().getSize(); i++) {
-
-            Arista<T> arista = verticeOrigen.getAdyacentes().getNodeValue(i);
-
+        for (Arista<T> arista : verticeOrigen.getAdyacentes()) {
             if (Objects.equals(arista.getDestino().getDato(), destino)) {
+                // Se elimina y se retorna inmediatamente; el iterador no vuelve a avanzar.
                 verticeOrigen.getAdyacentes().remove(arista);
                 return true;
             }
@@ -438,6 +430,16 @@ public class Grafo<T> {
      */
     public int getCantidadVertices() {
         return vertices.getSize();
+    }
+
+    /** Cuenta únicamente aristas con peso positivo (transferencias vigentes). */
+    public int contarAristasActivas(Vertice<T> vertice) {
+        if (vertice == null) return 0;
+        int cantidad = 0;
+        for (Arista<T> arista : vertice.getAdyacentes()) {
+            if (arista.getPeso() > 0) cantidad++;
+        }
+        return cantidad;
     }
 
     /**
