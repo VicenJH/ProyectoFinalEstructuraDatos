@@ -2,6 +2,7 @@
 package co.edu.uniquindio.proyectofinal;
 
 import co.edu.uniquindio.proyectofinal.Estructuras.Controllers.FintechController;
+import co.edu.uniquindio.proyectofinal.vistas.*;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
