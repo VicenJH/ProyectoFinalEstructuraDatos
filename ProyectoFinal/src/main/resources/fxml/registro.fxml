@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            stylesheets="@../css/fintech.css"
+            fx:controller="co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers.RegistroViewController"
+            styleClass="login-page">
+    <center>
+        <VBox alignment="CENTER" spacing="22" maxWidth="520">
+            <padding><Insets top="30" right="30" bottom="30" left="30"/></padding>
+
+            <VBox alignment="CENTER" spacing="8">
+                <Label text="NEXO" styleClass="brand-mark"/>
+                <Label text="Crea tu cuenta" styleClass="login-title"/>
+                <Label text="Regístrate para tener tus propias billeteras y recompensas" styleClass="login-subtitle"/>
+            </VBox>
+
+            <VBox spacing="12" styleClass="login-card, card-user">
+                <Label text="NUEVO USUARIO" styleClass="step-badge, badge-user"/>
+
+                <Label text="Cédula o identificación" styleClass="field-label"/>
+                <TextField fx:id="txtId" promptText="Ej. U010" styleClass="large-field"/>
+
+                <Label text="Nombre completo" styleClass="field-label"/>
+                <TextField fx:id="txtNombre" promptText="Ej. Ana Gómez" styleClass="large-field"/>
+
+                <Label text="Correo electrónico" styleClass="field-label"/>
+                <TextField fx:id="txtCorreo" promptText="ana@correo.com" onAction="#registrar" styleClass="large-field"/>
+
+                <Label fx:id="lblMensaje" text="" styleClass="muted-label" wrapText="true"/>
+
+                <Button text="Crear cuenta y entrar" onAction="#registrar" styleClass="primary-button" maxWidth="Infinity"/>
+                <Button text="Volver al inicio" onAction="#volverInicio" styleClass="outline-button" maxWidth="Infinity"/>
+            </VBox>
+
+            <Label text="Proyecto académico · Estructuras de datos · UniQuindío" styleClass="footer-label"/>
+        </VBox>
+    </center>
+</BorderPane>

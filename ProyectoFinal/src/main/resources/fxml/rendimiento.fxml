@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            stylesheets="@../css/fintech.css"
+            fx:controller="co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers.RendimientoViewController"
+            styleClass="app-page">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="16" styleClass="topbar, topbar-perf">
+            <VBox spacing="2">
+                <Label text="NEXO" styleClass="brand-small"/>
+                <Label text="COMPARACIÓN DE ESTRUCTURAS" styleClass="eyebrow"/>
+            </VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button text="Volver al panel" onAction="#volverPanel" styleClass="ghost-button"/>
+        </HBox>
+    </top>
+
+    <center>
+        <VBox spacing="16" styleClass="page-content">
+            <VBox spacing="5">
+                <Label text="Rendimiento de las estructuras de datos" styleClass="page-title"/>
+                <Label text="Misma carga de usuarios y mismas consultas aleatorias sobre tabla hash, lista enlazada y árbol AVL."
+                       styleClass="muted-label" wrapText="true"/>
+            </VBox>
+
+            <!-- Parámetros -->
+            <VBox spacing="10" styleClass="surface-card">
+                <HBox spacing="12" alignment="CENTER_LEFT">
+                    <VBox spacing="4">
+                        <Label text="Usuarios a insertar" styleClass="field-label"/>
+                        <TextField fx:id="txtUsuarios" text="2000" prefWidth="170"/>
+                    </VBox>
+                    <VBox spacing="4">
+                        <Label text="Consultas de búsqueda" styleClass="field-label"/>
+                        <TextField fx:id="txtConsultas" text="2000" prefWidth="170"/>
+                    </VBox>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="btnEjecutar" text="Ejecutar comparación" onAction="#ejecutar" styleClass="primary-button"/>
+                </HBox>
+                <ProgressBar fx:id="barraProgreso" progress="0" maxWidth="Infinity"/>
+                <Label fx:id="lblEstado" text="Máximo 10.000 usuarios y 10.000 consultas para que la prueba termine en pocos segundos."
+                       styleClass="muted-label" wrapText="true"/>
+            </VBox>
+
+            <!-- Gráficas -->
+            <HBox spacing="14">
+                <VBox spacing="6" styleClass="surface-card" HBox.hgrow="ALWAYS">
+                    <Label text="Tiempo de inserción (ms)" styleClass="section-title"/>
+                    <BarChart fx:id="graficaInsercion" legendVisible="false" animated="false" prefHeight="230">
+                        <xAxis><CategoryAxis/></xAxis>
+                        <yAxis><NumberAxis/></yAxis>
+                    </BarChart>
+                </VBox>
+                <VBox spacing="6" styleClass="surface-card" HBox.hgrow="ALWAYS">
+                    <Label text="Tiempo de búsqueda (ms)" styleClass="section-title"/>
+                    <BarChart fx:id="graficaBusqueda" legendVisible="false" animated="false" prefHeight="230">
+                        <xAxis><CategoryAxis/></xAxis>
+                        <yAxis><NumberAxis/></yAxis>
+                    </BarChart>
+                </VBox>
+            </HBox>
+
+            <!-- Tabla -->
+            <TableView fx:id="tablaResultados" VBox.vgrow="ALWAYS">
+                <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
+                <placeholder><Label text="Pulsa «Ejecutar comparación» para ver los resultados." styleClass="muted-label"/></placeholder>
+                <columns>
+                    <TableColumn fx:id="colEstructura" text="Estructura"/>
+                    <TableColumn fx:id="colElementos" text="Elementos"/>
+                    <TableColumn fx:id="colConsultas" text="Consultas"/>
+                    <TableColumn fx:id="colInsercion" text="Inserción (ms)"/>
+                    <TableColumn fx:id="colBusqueda" text="Búsqueda (ms)"/>
+                    <TableColumn fx:id="colAciertos" text="Aciertos"/>
+                </columns>
+            </TableView>
+            <Label fx:id="lblConclusion" text="" styleClass="info-text" wrapText="true"/>
+        </VBox>
+    </center>
+</BorderPane>

@@ -1,9 +1,10 @@
-package co.edu.uniquindio.proyectofinal.Presentacion.Controladores;
+package co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers;
 
 import co.edu.uniquindio.proyectofinal.App;
 import co.edu.uniquindio.proyectofinal.Estructuras.Controllers.FintechController;
 import co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos.*;
 import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
+import co.edu.uniquindio.proyectofinal.Presentacion.EtiquetasTabla;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
@@ -45,7 +46,7 @@ public class UserViewController {
 
     @FXML private TextField txtNuevaWalletCodigo, txtNuevaWalletNombre, txtMonto, txtDestino;
     @FXML private ChoiceBox<TipoBilletera> cmbNuevaWalletTipo;
-    @FXML private ComboBox<Billetera> cmbOrigen, cmbWalletProgramada;
+    @FXML private ComboBox<Billetera> cmbOrigen, cmbWalletProgramada, cmbBilleteraCupon;
     @FXML private TextField txtProgramadaId, txtProgramadaDestino, txtProgramadaMonto, txtProgramadaFecha;
     @FXML private ChoiceBox<TipoTransaccion> cmbProgramadaTipo;
     @FXML private ChoiceBox<Frecuencia> cmbProgramadaFrecuencia;
@@ -76,6 +77,7 @@ public class UserViewController {
         };
         cmbOrigen.setConverter(conversor);
         cmbWalletProgramada.setConverter(conversor);
+        cmbBilleteraCupon.setConverter(conversor);
     }
 
     public void configurar(ContextoAplicacion contexto, String idUsuario, Stage escenario) {
@@ -120,6 +122,15 @@ public class UserViewController {
         colAlertaTipo.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("tipoAlerta"));
         colAlertaMensaje.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("mensaje"));
         colAlertaAtendida.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isAtendida() ? "Sí" : "Pendiente"));
+
+        // Etiquetas de color para estados, tipos y niveles
+        EtiquetasTabla.aplicar(colWalletEstado);
+        EtiquetasTabla.aplicar(colTxTipo);
+        EtiquetasTabla.aplicar(colTxEstado);
+        EtiquetasTabla.aplicar(colProgTipo);
+        EtiquetasTabla.aplicar(colProgEstado);
+        EtiquetasTabla.aplicar(colCanjeEstado);
+        EtiquetasTabla.aplicar(colAlertaAtendida);
     }
 
     private void refrescarTodo() {
@@ -140,10 +151,9 @@ public class UserViewController {
         List<Billetera> billeteras = lista(usuario.getBilleteras());
         List<Billetera> activas = billeteras.stream().filter(Billetera::isActivo).toList();
         tablaBilleteras.setItems(FXCollections.observableArrayList(billeteras));
-        cmbOrigen.setItems(FXCollections.observableArrayList(activas));
-        cmbWalletProgramada.setItems(FXCollections.observableArrayList(activas));
-        if (cmbOrigen.getValue() == null && !activas.isEmpty()) cmbOrigen.getSelectionModel().selectFirst();
-        if (cmbWalletProgramada.getValue() == null && !activas.isEmpty()) cmbWalletProgramada.getSelectionModel().selectFirst();
+        actualizarCombo(cmbOrigen, activas);
+        actualizarCombo(cmbWalletProgramada, activas);
+        actualizarCombo(cmbBilleteraCupon, activas);
         long saldo = billeteras.stream().filter(Billetera::isActivo).mapToLong(Billetera::getSaldo).sum();
         lblSaldoTotal.setText(moneda(saldo));
 
@@ -156,6 +166,20 @@ public class UserViewController {
         tablaBeneficios.setItems(FXCollections.observableArrayList(lista(sistema.obtenerBeneficiosDisponibles())));
         tablaCanjes.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialCanjesUsuario(idUsuario))));
         tablaAlertas.setItems(FXCollections.observableArrayList(lista(usuario.getHistorialAlertas())));
+    }
+
+    /** Recarga las opciones y conserva la billetera elegida (por código) con su saldo actualizado. */
+    private void actualizarCombo(ComboBox<Billetera> combo, List<Billetera> activas) {
+        Billetera previa = combo.getValue();
+        combo.setItems(FXCollections.observableArrayList(activas));
+        Billetera elegida = null;
+        if (previa != null) {
+            for (Billetera candidata : activas) {
+                if (candidata.getCodigo() == previa.getCodigo()) { elegida = candidata; break; }
+            }
+        }
+        if (elegida == null && !activas.isEmpty()) elegida = activas.get(0);
+        combo.setValue(elegida);
     }
 
     @FXML private void crearBilletera() {
@@ -219,7 +243,7 @@ public class UserViewController {
     }
 
     @FXML private void aplicarCupon() {
-        Billetera wallet = cmbOrigen.getValue();
+        Billetera wallet = cmbBilleteraCupon.getValue();
         if (wallet == null) { aviso("Selecciona la billetera que recibirá el bono."); return; }
         Transaccion tx = sistema.aplicarCupon(idUsuario, wallet.getCodigo(), txtCodigoCupon.getText());
         if (tx == null) aviso("Cupón no válido, ya utilizado, de otro usuario o la billetera no puede recibir el abono.");

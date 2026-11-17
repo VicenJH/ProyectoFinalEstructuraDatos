@@ -1,4 +1,4 @@
-package co.edu.uniquindio.proyectofinal.Presentacion.Controladores;
+package co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers;
 
 import co.edu.uniquindio.proyectofinal.App;
 import co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos.Usuario;
@@ -54,6 +54,12 @@ public class LoginViewController {
         }
         App.mostrarVentana(escenario, contexto, "/fxml/admin.fxml", "NEXO · Administración", 1480, 940,
                 (controller, stage) -> ((AdminViewController) controller).configurar(contexto, stage));
+    }
+
+    @FXML
+    private void abrirRegistro() {
+        App.mostrarVentana(escenario, contexto, "/fxml/registro.fxml", "NEXO · Crear cuenta", 900, 760,
+                (controller, stage) -> ((RegistroViewController) controller).configurar(contexto, stage));
     }
 
     @FXML

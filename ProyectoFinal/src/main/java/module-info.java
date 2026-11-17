@@ -3,7 +3,7 @@ module co.edu.uniquindio.proyectofinal {
     requires javafx.fxml;
 
     opens co.edu.uniquindio.proyectofinal to javafx.fxml;
-    opens co.edu.uniquindio.proyectofinal.Presentacion.Controladores to javafx.fxml;
+    opens co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers to javafx.fxml;
     opens co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos to javafx.base;
 
     exports co.edu.uniquindio.proyectofinal;

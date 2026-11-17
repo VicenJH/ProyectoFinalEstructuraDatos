@@ -200,6 +200,19 @@ public final class PruebasRegresionFintech {
 
         Alerta primera = sistema.despacharSiguienteNotificacion();
         comprobar(primera != null && primera.isAtendida(), "despacho FIFO marca atendida");
+
+        // Una operación mensual del día 31 no debe "perder" el día tras un mes corto.
+        LocalDateTime finDeMes = LocalDateTime.of(2030, 1, 31, 12, 0);
+        comprobar(sistema.programarOperacion("P-M", 10, 500, 0, finDeMes,
+                TipoTransaccion.RECARGA, Frecuencia.MENSUAL, "PENDIENTE"), "programación mensual a fin de mes");
+        sistema.procesarOperacionesProgramadas(finDeMes);
+        sistema.procesarOperacionesProgramadas(LocalDateTime.of(2030, 2, 28, 12, 0));
+        LocalDateTime proxima = null;
+        for (OperacionProgramada pendiente : sistema.obtenerOperacionesPendientes()) {
+            if (pendiente.getId().equals("P-M")) proxima = pendiente.getFechaHora();
+        }
+        comprobar(LocalDateTime.of(2030, 3, 31, 12, 0).equals(proxima),
+                "mensual conserva el día 31 después de febrero");
     }
 
     private static void probarRecompensasYReversionConPuntosGastados() {

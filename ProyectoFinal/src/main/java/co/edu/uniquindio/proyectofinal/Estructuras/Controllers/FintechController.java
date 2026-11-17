@@ -171,9 +171,7 @@ public class FintechController {
         // Baja lógica: preserva transacciones, billeteras y referencias para auditoría/reversiones.
         arbolUsuariosPorPuntos.eliminar(usuario);
         usuario.setActivo(false);
-        for (Billetera billetera : usuario.getBilleteras()) {
-            billetera.setActivo(false);
-        }
+        usuario.desactivarBilleteras();
         // listaUsuarios conserva el registro histórico para que la analítica
         // no pierda la actividad de usuarios dados de baja. El árbol de puntos
         // y buscarUsuario() sí representan exclusivamente usuarios activos.
@@ -220,7 +218,11 @@ public class FintechController {
             return false;
         }
 
-        usuario.getBilleteras().addLast(nuevaBilletera);
+        try {
+            usuario.agregarBilletera(nuevaBilletera);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
         billeterasPorCodigo.insertar(codigoBilletera, nuevaBilletera);
         return true;
     }
@@ -400,16 +402,16 @@ public class FintechController {
                 riesgo.getNivel()
         );
         historialGlobal.addLast(tx);
-        actor.getHistorialTransacciones().addLast(tx);
-        origen.getHistorialTransacciones().addLast(tx);
+        actor.registrarTransaccion(tx);
+        origen.registrarTransaccion(tx);
 
         if (destino != null) {
-            destino.getHistorialTransacciones().addLast(tx);
+            destino.registrarTransaccion(tx);
 
             Usuario duenoDestino = usuariosPorId.buscar(destino.getIdUsuario());
 
             if (duenoDestino != null && !duenoDestino.getId().equals(actor.getId())) {
-                duenoDestino.getHistorialTransacciones().addLast(tx);
+                duenoDestino.registrarTransaccion(tx);
                 if (tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA) {
                     registrarTransferenciaEnGrafo(actor.getId(), duenoDestino.getId(), monto);
                 }
@@ -707,7 +709,7 @@ public class FintechController {
                 op.actualizarEstado(exito ? "EJECUTADA" : "FALLIDA");
                 operacionesProcesadas.addLast(op);
             } else {
-                op.reprogramar(siguienteFecha(op.getFechaHora(), op.getFrecuencia(), ahora));
+                op.reprogramar(op.calcularSiguienteFechaPosteriorA(ahora));
                 op.setNotificacionProximaEnviada(false);
                 operacionesProgramadas.encolar(op);
             }
@@ -741,16 +743,6 @@ public class FintechController {
             default:
                 return null;
         }
-    }
-
-    private LocalDateTime siguienteFecha(LocalDateTime actual, Frecuencia frecuencia, LocalDateTime ahora) {
-        LocalDateTime fecha = actual;
-
-        do {
-            fecha = frecuencia == Frecuencia.SEMANAL ? fecha.plusWeeks(1) : fecha.plusMonths(1);
-        } while (!fecha.isAfter(ahora));
-
-        return fecha;
     }
 
     /** @return operaciones pendientes ordenadas por fecha de ejecución. */
@@ -955,8 +947,8 @@ public class FintechController {
                 NivelRiesgo.BAJO
         );
         historialGlobal.addLast(transaccion);
-        usuario.getHistorialTransacciones().addLast(transaccion);
-        billetera.getHistorialTransacciones().addLast(transaccion);
+        usuario.registrarTransaccion(transaccion);
+        billetera.registrarTransaccion(transaccion);
         generarAlertaParaUsuario(usuario,
                 "Cupón " + canje.getCodigoRedencion() + " aplicado. Se abonaron $"
                         + canje.getValorBono() + " a la billetera " + codigoBilletera + ".",
@@ -1226,7 +1218,7 @@ public class FintechController {
         contadorAlertas++;
 
         Alerta alerta = new Alerta(contadorAlertas, LocalDateTime.now(), mensaje, tipoAlerta);
-        usuario.getHistorialAlertas().addLast(alerta);
+        usuario.registrarAlerta(alerta);
         notificacionesPendientes.encolar(alerta);
 
         System.out.println("⚠️ [" + tipoAlerta + "] Usuario: " + usuario.getNombre() + " - " + mensaje);
@@ -1347,7 +1339,7 @@ public class FintechController {
             if (propietario == null) continue;
             Billetera billetera = new Billetera(dato.codigo(), dato.nombre(), dato.tipo(),
                     dato.saldo(), dato.activa(), dato.idUsuario());
-            propietario.getBilleteras().addLast(billetera);
+            propietario.agregarBilletera(billetera);
             billeterasPorCodigo.insertar(billetera.getCodigo(), billetera);
         }
 
@@ -1368,17 +1360,17 @@ public class FintechController {
             int codigoOrigen = Integer.parseInt(tx.getBilleteraOrigen());
             Billetera origen = billeterasPorCodigo.buscar(codigoOrigen);
             Usuario propietarioOrigen = origen == null ? null : usuariosPorId.buscar(origen.getIdUsuario());
-            if (origen != null) origen.getHistorialTransacciones().addLast(tx);
-            if (propietarioOrigen != null) propietarioOrigen.getHistorialTransacciones().addLast(tx);
+            if (origen != null) origen.registrarTransaccion(tx);
+            if (propietarioOrigen != null) propietarioOrigen.registrarTransaccion(tx);
 
             if (tx.getBilleteraDestino() != null) {
                 Billetera destino = billeterasPorCodigo.buscar(Integer.parseInt(tx.getBilleteraDestino()));
                 if (destino != null) {
-                    destino.getHistorialTransacciones().addLast(tx);
+                    destino.registrarTransaccion(tx);
                     Usuario propietarioDestino = usuariosPorId.buscar(destino.getIdUsuario());
                     if (propietarioDestino != null && propietarioOrigen != null
                             && !propietarioDestino.getId().equals(propietarioOrigen.getId())) {
-                        propietarioDestino.getHistorialTransacciones().addLast(tx);
+                        propietarioDestino.registrarTransaccion(tx);
                     }
                     if (tx.getTipo() == TipoTransaccion.TRANSFERENCIA_EXTERNA
                             && propietarioOrigen != null && propietarioDestino != null) {
@@ -1408,7 +1400,7 @@ public class FintechController {
             if (usuario == null) continue;
             Alerta alerta = new Alerta(dato.id(), dato.fecha(), dato.mensaje(), dato.tipo());
             if (dato.atendida()) alerta.marcarAtendida();
-            usuario.getHistorialAlertas().addLast(alerta);
+            usuario.registrarAlerta(alerta);
             if (!dato.atendida()) notificacionesPendientes.encolar(alerta);
             contadorAlertas = Math.max(contadorAlertas, dato.id());
         }
@@ -1459,8 +1451,8 @@ public class FintechController {
 
     /**
      * Exporta una instantánea textual del estado del sistema en formato TSV UTF-8.
-     * Cada fila tiene un tipo de registro y campos escapados con 	,
-     y \\.
+     * Cada fila tiene un tipo de registro; en los campos se escapan el tabulador,
+     * los saltos de línea y la barra invertida.
      * No es un mecanismo de restauración automática; es un respaldo legible para
      * conservar los datos principales y permitir una restauración posterior.
      *
@@ -1523,14 +1515,15 @@ public class FintechController {
             for (Beneficio beneficio : catalogoBeneficios) {
                 escribirFilaRespaldo(writer, "BENEFICIO", beneficio.getId(), beneficio.getNombre(),
                         beneficio.getDescripcion(), String.valueOf(beneficio.getCostoPuntos()),
-                        String.valueOf(beneficio.isActivo()));
+                        String.valueOf(beneficio.isActivo()), String.valueOf(beneficio.getValorBono()));
             }
             for (CanjeBeneficio canje : historialCanjes) {
                 escribirFilaRespaldo(writer, "CANJE", canje.getId(), canje.getIdUsuario(),
                         canje.getIdBeneficio(), canje.getNombreBeneficio(), canje.getFechaHora().toString(),
                         String.valueOf(canje.getPuntosGastados()), canje.getEstado(),
                         canje.getCodigoRedencion(),
-                        canje.getFechaUso() == null ? "" : canje.getFechaUso().toString());
+                        canje.getFechaUso() == null ? "" : canje.getFechaUso().toString(),
+                        String.valueOf(canje.getValorBono()));
             }
 
             escribirFilaRespaldo(writer, "SECCION", "NOTIFICACIONES_PENDIENTES");

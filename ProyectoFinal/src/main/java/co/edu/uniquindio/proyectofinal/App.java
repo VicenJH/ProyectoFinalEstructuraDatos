@@ -1,7 +1,7 @@
 package co.edu.uniquindio.proyectofinal;
 
 import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
-import co.edu.uniquindio.proyectofinal.Presentacion.Controladores.LoginViewController;
+import co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers.LoginViewController;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;

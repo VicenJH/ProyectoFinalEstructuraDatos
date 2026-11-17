@@ -1,7 +1,8 @@
-package co.edu.uniquindio.proyectofinal.Presentacion.Controladores;
+package co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers;
 
 import co.edu.uniquindio.proyectofinal.App;
 import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
+import co.edu.uniquindio.proyectofinal.Presentacion.EtiquetasTabla;
 import co.edu.uniquindio.proyectofinal.pruebas.PruebasRegresionFintech;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -58,6 +59,7 @@ public class TestMonitorViewController {
         colResultadoTiempo.setCellValueFactory(c -> c.getValue().tiempoProperty());
         colResultadoComprobaciones.setCellValueFactory(c -> c.getValue().comprobacionesProperty());
         colResultadoDetalle.setCellValueFactory(c -> c.getValue().detalleProperty());
+        EtiquetasTabla.aplicar(colResultadoEstado);
         tablaResultados.setItems(filas);
         lblTotalGrupos.setText(String.valueOf(TOTAL_GRUPOS));
     }

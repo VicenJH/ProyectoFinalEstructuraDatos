@@ -1,16 +1,15 @@
-package co.edu.uniquindio.proyectofinal.Presentacion.Controladores;
+package co.edu.uniquindio.proyectofinal.Presentacion.ViewControllers;
 
 import co.edu.uniquindio.proyectofinal.App;
 import co.edu.uniquindio.proyectofinal.Estructuras.Controllers.FintechController;
 import co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos.*;
-import co.edu.uniquindio.proyectofinal.Estructuras.Persistencia.PersistenciaFintech;
 import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
+import co.edu.uniquindio.proyectofinal.Presentacion.EtiquetasTabla;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
-import javafx.util.StringConverter;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -25,6 +24,7 @@ public class AdminViewController {
     @FXML private Label lblRutaRespaldo, lblArchivoDatos;
     @FXML private TableView<Transaccion> tablaUltimasTransacciones, tablaTransacciones;
     @FXML private TableView<Usuario> tablaUsuarios;
+    @FXML private TextField txtBuscarUsuario;
     @FXML private TableView<Billetera> tablaBilleteras;
     @FXML private TableView<OperacionProgramada> tablaProgramadas;
     @FXML private TableView<Beneficio> tablaBeneficios;
@@ -48,9 +48,8 @@ public class AdminViewController {
     @FXML private TableColumn<Transaccion, TipoTransaccion> colUltimoTipo, colTxTipo;
     @FXML private TableColumn<Transaccion, Number> colUltimoMonto, colTxMonto;
     @FXML private TableColumn<Transaccion, String> colUltimoEstado, colTxId, colTxUsuario, colTxOrigen, colTxDestino, colTxRiesgo, colTxEstado;
-    @FXML private TableColumn<Usuario, String> colUsuarioId, colUsuarioNombre, colUsuarioCorreo, colUsuarioNivel;
+    @FXML private TableColumn<Usuario, String> colUsuarioId, colUsuarioNombre, colUsuarioCorreo, colUsuarioNivel, colUsuarioActivo;
     @FXML private TableColumn<Usuario, Number> colUsuarioPuntos;
-    @FXML private TableColumn<Usuario, Boolean> colUsuarioActivo;
     @FXML private TableColumn<Billetera, Number> colBilleteraCodigo, colBilleteraSaldo;
     @FXML private TableColumn<Billetera, String> colBilleteraUsuario, colBilleteraNombre, colBilleteraTipo, colBilleteraEstado;
     @FXML private TableColumn<OperacionProgramada, String> colProgId, colProgUsuario, colProgTipo, colProgFrecuencia, colProgEstado;
@@ -123,7 +122,7 @@ public class AdminViewController {
         colUsuarioCorreo.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("correo"));
         colUsuarioPuntos.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("puntosAcumulados"));
         colUsuarioNivel.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("nivel"));
-        colUsuarioActivo.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("activo"));
+        colUsuarioActivo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isActivo() ? "ACTIVO" : "BAJA"));
 
         colBilleteraCodigo.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("codigo"));
         colBilleteraUsuario.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("idUsuario"));
@@ -177,6 +176,21 @@ public class AdminViewController {
         colAlertaMensaje.setCellValueFactory(new javafx.scene.control.cell.PropertyValueFactory<>("mensaje"));
         colAlertaAtendida.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().isAtendida() ? "Atendida" : "Pendiente"));
         colAlertaUsuario.setCellValueFactory(c -> new SimpleStringProperty(buscarUsuarioDeAlerta(c.getValue())));
+
+        // Etiquetas de color para estados, tipos y niveles
+        EtiquetasTabla.aplicar(colUsuarioNivel);
+        EtiquetasTabla.aplicar(colUsuarioActivo);
+        EtiquetasTabla.aplicar(colBilleteraEstado);
+        EtiquetasTabla.aplicar(colTxTipo);
+        EtiquetasTabla.aplicar(colTxRiesgo);
+        EtiquetasTabla.aplicar(colTxEstado);
+        EtiquetasTabla.aplicar(colUltimoTipo);
+        EtiquetasTabla.aplicar(colUltimoEstado);
+        EtiquetasTabla.aplicar(colProgTipo);
+        EtiquetasTabla.aplicar(colProgEstado);
+        EtiquetasTabla.aplicar(colCanjeEstado);
+        EtiquetasTabla.aplicar(colAudNivel);
+        EtiquetasTabla.aplicar(colAlertaAtendida);
     }
 
     private String obtenerUsuarioOrigen(Transaccion tx) {
@@ -228,6 +242,37 @@ public class AdminViewController {
         if (sistema.registrarUsuario(txtUsuarioId.getText(), txtUsuarioNombre.getText(), txtUsuarioCorreo.getText()))
             mutacion("Usuario registrado correctamente.");
         else aviso("No se pudo registrar el usuario. Revisa la identificación y los datos obligatorios.");
+    }
+
+    @FXML private void buscarUsuario() {
+        String consulta = txtBuscarUsuario.getText() == null ? "" : txtBuscarUsuario.getText().trim();
+        if (consulta.isEmpty()) { verTodosUsuarios(); return; }
+        List<Usuario> resultado = new ArrayList<>();
+        Usuario exacto = sistema.buscarUsuario(consulta);          // búsqueda O(1) en la tabla hash
+        if (exacto != null) {
+            resultado.add(exacto);
+        } else {
+            String patron = consulta.toLowerCase();
+            for (Usuario usuario : lista(sistema.obtenerUsuarios())) {
+                if (usuario.getNombre().toLowerCase().contains(patron)
+                        || usuario.getCorreo().toLowerCase().contains(patron)
+                        || usuario.getId().toLowerCase().contains(patron)) {
+                    resultado.add(usuario);
+                }
+            }
+        }
+        tablaUsuarios.setItems(FXCollections.observableArrayList(resultado));
+        if (resultado.isEmpty()) aviso("No se encontraron usuarios para «" + consulta + "».");
+    }
+
+    @FXML private void verTodosUsuarios() {
+        txtBuscarUsuario.clear();
+        tablaUsuarios.setItems(FXCollections.observableArrayList(lista(sistema.obtenerUsuarios())));
+    }
+
+    @FXML private void abrirRendimiento() {
+        App.mostrarVentana(escenario, contexto, "/fxml/rendimiento.fxml", "NEXO · Comparación de estructuras", 1320, 900,
+                (controller, stage) -> ((RendimientoViewController) controller).configurar(contexto, stage));
     }
 
     @FXML private void modificarUsuario() {
@@ -358,6 +403,10 @@ public class AdminViewController {
         texto.append("\nUSUARIOS CON MAYOR ACTIVIDAD\n");
         for (Usuario usuario : analitica.obtenerUsuariosMasActivos(5, desde, hasta))
             texto.append(" • ").append(usuario.getNombre()).append(" ( ").append(usuario.getId()).append(" )\n");
+        texto.append("\nTRANSACCIONES DE MAYOR VALOR\n");
+        for (Transaccion tx : analitica.obtenerTransaccionesMayorValor(5))
+            texto.append(" • ").append(tx.getId()).append(" · ").append(tx.getTipo()).append(" · ")
+                    .append(moneda(Math.round(tx.getValor()))).append('\n');
         texto.append("\nRUTAS FRECUENTES\n");
         for (var ruta : analitica.obtenerRutasFrecuentes(5)) texto.append(" • ").append(ruta).append('\n');
         txtAnalitica.setText(texto.toString());
