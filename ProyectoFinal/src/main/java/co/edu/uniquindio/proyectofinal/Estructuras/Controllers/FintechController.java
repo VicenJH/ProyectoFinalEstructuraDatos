@@ -145,19 +145,20 @@ public class FintechController {
         return usuario != null && usuario.isActivo() ? usuario : null;
     }
 
-    /** Modifica nombre y correo de un usuario. No toca id ni puntos. */
+    /**
+     * Modifica nombre y correo de un usuario activo. No toca id ni puntos.
+     * La operación es atómica: si el nombre o el correo no son válidos (correo con formato
+     * incorrecto, campos vacíos) no se cambia ninguno de los dos y se devuelve false.
+     */
     public boolean modificarUsuario(String id, String nombre, String correo) {
         Usuario usuario = buscarUsuario(id);
-
-        if (usuario == null
-                || nombre == null || nombre.trim().isEmpty()
-                || correo == null || correo.trim().isEmpty()) {
+        if (usuario == null) return false;
+        try {
+            usuario.actualizarDatos(nombre, correo);
+            return true;
+        } catch (IllegalArgumentException ex) {
             return false;
         }
-
-        usuario.setNombre(nombre);
-        usuario.setCorreo(correo);
-        return true;
     }
 
     /**

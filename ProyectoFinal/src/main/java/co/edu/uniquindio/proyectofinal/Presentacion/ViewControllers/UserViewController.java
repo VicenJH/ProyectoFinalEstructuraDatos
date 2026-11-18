@@ -60,6 +60,7 @@ public class UserViewController {
     @FXML private ChoiceBox<Frecuencia> cmbProgramadaFrecuencia;
     @FXML private TextField txtCodigoCupon;
     @FXML private Label lblProgramadaInfo;
+    @FXML private TextField txtPerfilNombre, txtPerfilCorreo;
 
     private ContextoAplicacion contexto;
     private FintechController sistema;
@@ -165,6 +166,27 @@ public class UserViewController {
         EtiquetasTabla.aplicar(colAlertaAtendida);
     }
 
+    /** Copia los datos guardados a los campos editables (solo en el refresco completo, no en el automático). */
+    private void cargarFormularioPerfil(Usuario usuario) {
+        txtPerfilNombre.setText(usuario.getNombre());
+        txtPerfilCorreo.setText(usuario.getCorreo());
+    }
+
+    @FXML private void guardarPerfil() {
+        if (sistema.modificarUsuario(idUsuario, txtPerfilNombre.getText(), txtPerfilCorreo.getText())) {
+            mutacion("Tus datos se actualizaron correctamente.");
+        } else {
+            aviso("No se pudo guardar. El nombre no puede estar vacío y el correo debe tener un formato válido, "
+                    + "por ejemplo nombre@correo.com.");
+        }
+    }
+
+    /** Descarta lo escrito y vuelve a mostrar los datos guardados. */
+    @FXML private void restablecerPerfil() {
+        Usuario usuario = sistema.buscarUsuario(idUsuario);
+        if (usuario != null) cargarFormularioPerfil(usuario);
+    }
+
     /** Refresco completo: datos, listas desplegables y catálogo de recompensas. */
     private void refrescarTodo() {
         Usuario usuario = sistema.buscarUsuario(idUsuario);
@@ -174,6 +196,7 @@ public class UserViewController {
             return;
         }
         refrescarDatos(usuario);
+        cargarFormularioPerfil(usuario);
         List<Billetera> activas = lista(usuario.getBilleteras()).stream().filter(Billetera::isActivo).toList();
         actualizarCombo(cmbOrigen, activas);
         actualizarCombo(cmbWalletProgramada, activas);
