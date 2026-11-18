@@ -159,9 +159,15 @@
                                 </FlowPane>
                                 <HBox styleClass="info-box">
                                     <Label wrapText="true" styleClass="info-text"
-                                           text="Formato de fecha: AAAA-MM-DDTHH:MM (ej. 2026-12-01T09:30). Las operaciones se procesan en orden de fecha mediante una cola de prioridad."/>
+                                           text="Formato de fecha: AAAA-MM-DDTHH:MM (ej. 2026-12-01T09:30). Las operaciones se procesan en orden de fecha mediante una cola de prioridad. Selecciona una fila para cargar sus datos y editarlos."/>
                                 </HBox>
                             </VBox>
+                            <HBox spacing="10" alignment="CENTER_LEFT">
+                                <Button text="Actualizar" onAction="#actualizarProgramada" styleClass="secondary-button"/>
+                                <Button text="Eliminar" onAction="#eliminarProgramada" styleClass="danger-button"/>
+                                <Label fx:id="lblProgramadaInfo" text="Selecciona una fila para editarla o eliminarla."
+                                       styleClass="muted-label" wrapText="true"/>
+                            </HBox>
                             <TableView fx:id="tablaProgramadas" VBox.vgrow="ALWAYS">
                                 <columnResizePolicy><TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/></columnResizePolicy>
                                 <placeholder><Label text="No tienes operaciones programadas." styleClass="muted-label"/></placeholder>
@@ -257,3 +263,4 @@
         </VBox>
     </center>
 </BorderPane>
+

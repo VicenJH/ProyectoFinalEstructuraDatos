@@ -220,6 +220,7 @@ public class AdminViewController {
         tablaTransacciones.setItems(FXCollections.observableArrayList(transacciones));
         tablaProgramadas.setItems(FXCollections.observableArrayList(lista(sistema.obtenerOperacionesPendientes())));
         tablaBeneficios.setItems(FXCollections.observableArrayList(lista(sistema.obtenerCatalogoBeneficios())));
+        tablaBeneficios.refresh();
         tablaCanjes.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialCanjes())));
         tablaAuditoria.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialAuditoria())));
         tablaAlertas.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialAlertasGlobal())));

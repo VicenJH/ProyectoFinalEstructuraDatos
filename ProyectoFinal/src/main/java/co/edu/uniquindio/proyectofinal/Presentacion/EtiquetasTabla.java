@@ -37,7 +37,7 @@ public final class EtiquetasTabla {
                 return "tag-ok";
             case "PENDIENTE", "MEDIO", "UTILIZADO":
                 return "tag-warn";
-            case "RECHAZADA", "BAJA", "INACTIVA", "FALLO", "ALTO", "RETIRO":
+            case "RECHAZADA", "BAJA", "INACTIVA", "FALLO", "FALLIDA", "ALTO", "RETIRO":
                 return "tag-bad";
             case "REVERTIDA", "BONIFICACION", "PLATINO":
                 return "tag-violet";
@@ -50,6 +50,9 @@ public final class EtiquetasTabla {
             default:
                 if (t.startsWith("TRANSFERENCIA")) {
                     return "tag-info";
+                }
+                if (t.startsWith("CANCELADA")) {
+                    return "tag-neutral";
                 }
                 return "tag-neutral";
         }

@@ -5,17 +5,25 @@ import co.edu.uniquindio.proyectofinal.Estructuras.Controllers.FintechController
 import co.edu.uniquindio.proyectofinal.Estructuras.ModeloDatos.*;
 import co.edu.uniquindio.proyectofinal.Presentacion.ContextoAplicacion;
 import co.edu.uniquindio.proyectofinal.Presentacion.EtiquetasTabla;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import javafx.util.StringConverter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 public class UserViewController {
 
@@ -51,11 +59,20 @@ public class UserViewController {
     @FXML private ChoiceBox<TipoTransaccion> cmbProgramadaTipo;
     @FXML private ChoiceBox<Frecuencia> cmbProgramadaFrecuencia;
     @FXML private TextField txtCodigoCupon;
+    @FXML private Label lblProgramadaInfo;
 
     private ContextoAplicacion contexto;
     private FintechController sistema;
     private Stage escenario;
     private String idUsuario;
+
+    private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+    private static final DateTimeFormatter FORMATO_HORA = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    /** Refresca las tablas cada pocos segundos para ver cuándo se ejecuta una operación programada. */
+    private Timeline autoRefresco;
+    /** Evita que el refresco automático dispare la carga del formulario al reponer la selección. */
+    private boolean cargandoTabla;
 
     @FXML
     private void initialize() {
@@ -78,6 +95,11 @@ public class UserViewController {
         cmbOrigen.setConverter(conversor);
         cmbWalletProgramada.setConverter(conversor);
         cmbBilleteraCupon.setConverter(conversor);
+
+        // Al elegir una operación pendiente se cargan sus datos en el formulario para poder editarla.
+        tablaProgramadas.getSelectionModel().selectedItemProperty().addListener((obs, anterior, nueva) -> {
+            if (!cargandoTabla && nueva != null) cargarFormularioProgramada(nueva);
+        });
     }
 
     public void configurar(ContextoAplicacion contexto, String idUsuario, Stage escenario) {
@@ -86,6 +108,16 @@ public class UserViewController {
         this.idUsuario = idUsuario;
         this.escenario = escenario;
         refrescarTodo();
+        if (sistema.buscarUsuario(idUsuario) != null) iniciarAutoRefresco();
+    }
+
+    private void iniciarAutoRefresco() {
+        autoRefresco = new Timeline(new KeyFrame(Duration.seconds(3), evento -> {
+            Usuario usuario = sistema.buscarUsuario(idUsuario);
+            if (usuario != null) refrescarDatos(usuario);
+        }));
+        autoRefresco.setCycleCount(Timeline.INDEFINITE);
+        autoRefresco.play();
     }
 
     private void configurarColumnas() {
@@ -133,6 +165,7 @@ public class UserViewController {
         EtiquetasTabla.aplicar(colAlertaAtendida);
     }
 
+    /** Refresco completo: datos, listas desplegables y catálogo de recompensas. */
     private void refrescarTodo() {
         Usuario usuario = sistema.buscarUsuario(idUsuario);
         if (usuario == null) {
@@ -140,6 +173,20 @@ public class UserViewController {
             cerrarSesion();
             return;
         }
+        refrescarDatos(usuario);
+        List<Billetera> activas = lista(usuario.getBilleteras()).stream().filter(Billetera::isActivo).toList();
+        actualizarCombo(cmbOrigen, activas);
+        actualizarCombo(cmbWalletProgramada, activas);
+        actualizarCombo(cmbBilleteraCupon, activas);
+        tablaBeneficios.setItems(FXCollections.observableArrayList(lista(sistema.obtenerBeneficiosDisponibles())));
+        tablaCanjes.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialCanjesUsuario(idUsuario))));
+    }
+
+    /**
+     * Refresco liviano (también lo usa el temporizador): etiquetas y tablas de datos, sin tocar
+     * formularios, listas desplegables ni la selección del catálogo de recompensas.
+     */
+    private void refrescarDatos(Usuario usuario) {
         lblNombreUsuario.setText("Hola, " + usuario.getNombre());
         lblIdentificacion.setText("Cédula " + usuario.getId());
         lblPerfilNombre.setText(usuario.getNombre());
@@ -149,23 +196,104 @@ public class UserViewController {
         lblNivel.setText(usuario.getNivel());
 
         List<Billetera> billeteras = lista(usuario.getBilleteras());
-        List<Billetera> activas = billeteras.stream().filter(Billetera::isActivo).toList();
         tablaBilleteras.setItems(FXCollections.observableArrayList(billeteras));
-        actualizarCombo(cmbOrigen, activas);
-        actualizarCombo(cmbWalletProgramada, activas);
-        actualizarCombo(cmbBilleteraCupon, activas);
         long saldo = billeteras.stream().filter(Billetera::isActivo).mapToLong(Billetera::getSaldo).sum();
         lblSaldoTotal.setText(moneda(saldo));
 
-        tablaTransacciones.setItems(FXCollections.observableArrayList(lista(usuario.getHistorialTransacciones())));
-        List<OperacionProgramada> propias = new ArrayList<>();
-        for (OperacionProgramada op : sistema.obtenerOperacionesPendientes()) {
-            if (idUsuario.equals(op.getIdUsuario())) propias.add(op);
+        List<Transaccion> transacciones = lista(usuario.getHistorialTransacciones());
+        if (tablaTransacciones.getItems().size() != transacciones.size()) {
+            tablaTransacciones.setItems(FXCollections.observableArrayList(transacciones));
         }
-        tablaProgramadas.setItems(FXCollections.observableArrayList(propias));
-        tablaBeneficios.setItems(FXCollections.observableArrayList(lista(sistema.obtenerBeneficiosDisponibles())));
-        tablaCanjes.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialCanjesUsuario(idUsuario))));
-        tablaAlertas.setItems(FXCollections.observableArrayList(lista(usuario.getHistorialAlertas())));
+        List<Alerta> alertas = lista(usuario.getHistorialAlertas());
+        if (tablaAlertas.getItems().size() != alertas.size()) {
+            tablaAlertas.setItems(FXCollections.observableArrayList(alertas));
+        }
+        actualizarTablaProgramadas();
+    }
+
+    /** Pendientes (por fecha) seguidas de las ya procesadas, la más reciente primero. Las canceladas no se muestran. */
+    private List<OperacionProgramada> operacionesProgramadasDelUsuario() {
+        List<OperacionProgramada> resultado = new ArrayList<>();
+        for (OperacionProgramada op : sistema.obtenerOperacionesPendientes()) {
+            if (idUsuario.equals(op.getIdUsuario())) resultado.add(op);
+        }
+        List<OperacionProgramada> procesadas = new ArrayList<>();
+        for (OperacionProgramada op : sistema.obtenerOperacionesProcesadas()) {
+            if (idUsuario.equals(op.getIdUsuario())
+                    && !OperacionProgramada.CANCELADA_POR_USUARIO.equals(op.getEstado())) {
+                procesadas.add(op);
+            }
+        }
+        Collections.reverse(procesadas);
+        resultado.addAll(procesadas);
+        return resultado;
+    }
+
+    private static String clave(OperacionProgramada op) {
+        return op.getId() + "|" + op.getEstado() + "|" + op.getFechaHora() + "|" + op.getValor()
+                + "|" + op.getTipo() + "|" + op.getFrecuencia() + "|" + op.getBilleteraOrigen()
+                + "|" + op.getBilleteraDestino();
+    }
+
+    /** Actualiza la tabla solo si algo cambió y conserva la fila seleccionada (por identificador). */
+    private void actualizarTablaProgramadas() {
+        List<OperacionProgramada> nuevas = operacionesProgramadasDelUsuario();
+        List<OperacionProgramada> actuales = tablaProgramadas.getItems();
+        boolean igual = actuales.size() == nuevas.size();
+        for (int i = 0; igual && i < nuevas.size(); i++) {
+            igual = clave(actuales.get(i)).equals(clave(nuevas.get(i)));
+        }
+        if (igual) return;
+
+        OperacionProgramada seleccionada = tablaProgramadas.getSelectionModel().getSelectedItem();
+        String idSeleccionado = seleccionada == null ? null : seleccionada.getId();
+        cargandoTabla = true;
+        try {
+            tablaProgramadas.setItems(FXCollections.observableArrayList(nuevas));
+            if (idSeleccionado != null) {
+                for (OperacionProgramada op : nuevas) {
+                    if (op.getId().equals(idSeleccionado)) {
+                        tablaProgramadas.getSelectionModel().select(op);
+                        break;
+                    }
+                }
+            }
+        } finally {
+            cargandoTabla = false;
+        }
+    }
+
+    private void cargarFormularioProgramada(OperacionProgramada op) {
+        if (!OperacionProgramada.PENDIENTE.equals(op.getEstado())) {
+            lblProgramadaInfo.setText("La operación " + op.getId() + " ya está " + op.getEstado()
+                    + " y no se puede modificar.");
+            return;
+        }
+        txtProgramadaId.setText(op.getId());
+        for (Billetera billetera : cmbWalletProgramada.getItems()) {
+            if (String.valueOf(billetera.getCodigo()).equals(op.getBilleteraOrigen())) {
+                cmbWalletProgramada.setValue(billetera);
+                break;
+            }
+        }
+        txtProgramadaDestino.setText(op.getBilleteraDestino() == null ? "" : op.getBilleteraDestino());
+        txtProgramadaMonto.setText(String.valueOf(Math.round(op.getValor())));
+        txtProgramadaFecha.setText(op.getFechaHora().format(FORMATO_FECHA));
+        cmbProgramadaTipo.setValue(op.getTipo());
+        cmbProgramadaFrecuencia.setValue(op.getFrecuencia());
+        lblProgramadaInfo.setText("Editando " + op.getId()
+                + ". Cambia los datos y pulsa Actualizar, o Eliminar para cancelarla.");
+    }
+
+    private void limpiarFormularioProgramada() {
+        tablaProgramadas.getSelectionModel().clearSelection();
+        txtProgramadaId.clear();
+        txtProgramadaDestino.clear();
+        txtProgramadaMonto.clear();
+        txtProgramadaFecha.clear();
+        cmbProgramadaTipo.getSelectionModel().select(TipoTransaccion.RECARGA);
+        cmbProgramadaFrecuencia.getSelectionModel().select(Frecuencia.UNICA);
+        lblProgramadaInfo.setText("Selecciona una fila para editarla o eliminarla.");
     }
 
     /** Recarga las opciones y conserva la billetera elegida (por código) con su saldo actualizado. */
@@ -222,12 +350,85 @@ public class UserViewController {
             String id = txtProgramadaId.getText().isBlank()
                     ? "USR-" + idUsuario + "-" + System.currentTimeMillis() : txtProgramadaId.getText().trim();
             int destino = txtProgramadaDestino.getText().isBlank() ? 0 : entero(txtProgramadaDestino);
-            LocalDateTime fecha = LocalDateTime.parse(txtProgramadaFecha.getText().trim());
+            LocalDateTime fecha = leerFechaProgramada();
             boolean ok = sistema.programarOperacion(id, entero(txtProgramadaMonto), origen.getCodigo(), destino,
                     fecha, cmbProgramadaTipo.getValue(), cmbProgramadaFrecuencia.getValue(), "PENDIENTE");
-            if (ok) mutacion("La operación quedó en cola y se ejecutará automáticamente cuando llegue su fecha.");
-            else aviso("No se pudo programar. Verifica el destino y que la fecha sea válida.");
-        } catch (RuntimeException ex) { aviso("Usa la fecha AAAA-MM-DDTHH:MM y valores válidos. " + ex.getMessage()); }
+            if (ok) {
+                mutacion("La operación quedó en cola y se ejecutará automáticamente cuando llegue su fecha.");
+                limpiarFormularioProgramada();
+            } else {
+                aviso("No se pudo programar. Verifica el destino, que el identificador no esté repetido "
+                        + "(si cargaste una fila, cámbialo) y que los datos sean válidos.");
+            }
+        } catch (NumberFormatException ex) {
+            aviso("El monto y el destino deben ser números enteros.");
+        } catch (RuntimeException ex) {
+            aviso(ex.getMessage());
+        }
+    }
+
+    /** Modifica la operación pendiente seleccionada; sin selección solo refresca la lista. */
+    @FXML private void actualizarProgramada() {
+        OperacionProgramada seleccionada = tablaProgramadas.getSelectionModel().getSelectedItem();
+        if (seleccionada == null) {
+            refrescarTodo();
+            lblProgramadaInfo.setText("Lista actualizada a las " + LocalTime.now().format(FORMATO_HORA) + ".");
+            return;
+        }
+        if (!OperacionProgramada.PENDIENTE.equals(seleccionada.getEstado())) {
+            refrescarTodo();
+            lblProgramadaInfo.setText("La operación " + seleccionada.getId() + " ya está "
+                    + seleccionada.getEstado() + " y no se puede modificar.");
+            return;
+        }
+        try {
+            Billetera origen = cmbWalletProgramada.getValue();
+            if (origen == null) { aviso("Selecciona una billetera de origen."); return; }
+            int destino = txtProgramadaDestino.getText().isBlank() ? 0 : entero(txtProgramadaDestino);
+            LocalDateTime fecha = leerFechaProgramada();
+            boolean ok = sistema.modificarOperacionProgramada(seleccionada.getId(), idUsuario,
+                    entero(txtProgramadaMonto), origen.getCodigo(), destino, fecha,
+                    cmbProgramadaTipo.getValue(), cmbProgramadaFrecuencia.getValue());
+            if (ok) mutacion("La operación " + seleccionada.getId() + " se actualizó correctamente.");
+            else aviso("No se pudo actualizar. Verifica el destino, el monto y que la operación siga pendiente.");
+        } catch (NumberFormatException ex) {
+            aviso("El monto y el destino deben ser números enteros.");
+        } catch (RuntimeException ex) {
+            aviso(ex.getMessage());
+        }
+    }
+
+    /** Cancela la operación pendiente seleccionada: sale de la cola y ya no se ejecuta. */
+    @FXML private void eliminarProgramada() {
+        OperacionProgramada seleccionada = tablaProgramadas.getSelectionModel().getSelectedItem();
+        if (seleccionada == null) { aviso("Selecciona una operación de la tabla."); return; }
+        if (!OperacionProgramada.PENDIENTE.equals(seleccionada.getEstado())) {
+            aviso("Solo se pueden eliminar operaciones pendientes. Esta ya está " + seleccionada.getEstado() + ".");
+            return;
+        }
+        Alert confirmacion = new Alert(Alert.AlertType.CONFIRMATION,
+                "¿Eliminar la operación " + seleccionada.getId() + "? Dejará de ejecutarse.",
+                ButtonType.OK, ButtonType.CANCEL);
+        confirmacion.setTitle("Confirmar");
+        confirmacion.setHeaderText(null);
+        Optional<ButtonType> respuesta = confirmacion.showAndWait();
+        if (respuesta.isEmpty() || respuesta.get() != ButtonType.OK) return;
+
+        if (sistema.cancelarOperacionProgramada(seleccionada.getId(), idUsuario)) {
+            mutacion("La operación se eliminó y ya no se ejecutará.");
+            limpiarFormularioProgramada();
+        } else {
+            aviso("No se pudo eliminar: la operación ya no está pendiente.");
+        }
+    }
+
+    private LocalDateTime leerFechaProgramada() {
+        try {
+            return LocalDateTime.parse(txtProgramadaFecha.getText().trim());
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException(
+                    "La fecha debe tener el formato AAAA-MM-DDTHH:MM, por ejemplo 2026-12-01T09:30.");
+        }
     }
 
     @FXML private void canjearBeneficio() {
@@ -264,6 +465,7 @@ public class UserViewController {
     }
 
     @FXML private void cerrarSesion() {
+        if (autoRefresco != null) autoRefresco.stop();
         App.mostrarVentana(escenario, contexto, "/fxml/inicio.fxml", "NEXO · Billetera digital", 1120, 760,
                 (controller, stage) -> ((LoginViewController) controller).configurar(contexto, stage));
     }

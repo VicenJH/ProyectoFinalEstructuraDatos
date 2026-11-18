@@ -1430,8 +1430,12 @@ public class FintechController {
     }
 
     private OperacionProgramada restaurarOperacion(EstadoFintech.OperacionData dato) {
+        // El constructor solo admite operaciones nuevas (PENDIENTE); las ya procesadas se crean
+        // pendientes y luego se les aplica su estado final (EJECUTADA, FALLIDA, CANCELADA_*).
         OperacionProgramada op = new OperacionProgramada(dato.id(), dato.valor(), dato.origen(),
-                dato.destino(), dato.fecha(), dato.tipo(), dato.frecuencia(), dato.estado(), dato.idUsuario());
+                dato.destino(), dato.fecha(), dato.tipo(), dato.frecuencia(),
+                OperacionProgramada.PENDIENTE, dato.idUsuario());
+        if (!OperacionProgramada.PENDIENTE.equals(dato.estado())) op.actualizarEstado(dato.estado());
         op.setNotificacionProximaEnviada(dato.notificacionEnviada());
         return op;
     }
@@ -1563,5 +1567,92 @@ public class FintechController {
                     .replace("\n", "\\n"));
         }
         writer.newLine();
+    }
+
+    // ------------------------------------------------------------------
+    // MODIFICAR Y CANCELAR OPERACIONES PROGRAMADAS PENDIENTES
+    // ------------------------------------------------------------------
+
+    /**
+     * Busca una operación PENDIENTE por su identificador.
+     *
+     * @param idUsuario si no es null, la operación debe pertenecer a ese usuario.
+     * @return la operación, o null si no existe, ya no está pendiente o es de otro usuario.
+     */
+    private OperacionProgramada buscarOperacionPendiente(String id, String idUsuario) {
+        if (id == null) return null;
+        for (OperacionProgramada op : operacionesProgramadas.aListaOrdenada()) {
+            if (op.getId().equals(id.trim())) {
+                boolean esDelUsuario = idUsuario == null || idUsuario.equals(op.getIdUsuario());
+                return esDelUsuario ? op : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Cancela una operación programada pendiente. La operación sale de la cola de
+     * prioridad y queda archivada con estado CANCELADA_POR_USUARIO (su id no se reutiliza).
+     *
+     * @return true si se canceló; false si no existe, ya no está pendiente o es de otro usuario.
+     */
+    public boolean cancelarOperacionProgramada(String id, String idUsuario) {
+        if (buscarOperacionPendiente(id, idUsuario) == null) return false;
+
+        SimpleLinkedList<OperacionProgramada> pendientes = operacionesProgramadas.aListaOrdenada();
+        operacionesProgramadas.clear();
+        for (OperacionProgramada op : pendientes) {
+            if (op.getId().equals(id.trim())) {
+                op.actualizarEstado(OperacionProgramada.CANCELADA_POR_USUARIO);
+                operacionesProcesadas.addLast(op);
+            } else {
+                operacionesProgramadas.encolar(op);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Modifica una operación programada pendiente (monto, billeteras, fecha, tipo y
+     * frecuencia). Conserva el mismo identificador y valida igual que programarOperacion.
+     *
+     * @return true si se modificó; false si no existe, ya no está pendiente, es de otro
+     * usuario o los nuevos datos no son válidos (en ese caso nada cambia).
+     */
+    public boolean modificarOperacionProgramada(String id, String idUsuario, double valor, int codOrigen,
+                                                int codDestino, LocalDateTime fechaHora,
+                                                TipoTransaccion tipo, Frecuencia frecuencia) {
+        OperacionProgramada actual = buscarOperacionPendiente(id, idUsuario);
+        Billetera origen = billeterasPorCodigo.buscar(codOrigen);
+        if (actual == null || origen == null || !origen.isActivo()
+                || !origen.getIdUsuario().equals(actual.getIdUsuario())
+                || tipo == null || tipo == TipoTransaccion.BONIFICACION
+                || fechaHora == null || frecuencia == null || convertirMonto(valor) == null) {
+            return false;
+        }
+
+        boolean esTransferencia = tipo == TipoTransaccion.TRANSFERENCIA_INTERNA
+                || tipo == TipoTransaccion.TRANSFERENCIA_EXTERNA;
+        if (esTransferencia) {
+            Billetera destino = billeterasPorCodigo.buscar(codDestino);
+            if (destino == null || !destino.isActivo() || codOrigen == codDestino
+                    || buscarUsuario(destino.getIdUsuario()) == null) return false;
+        }
+
+        OperacionProgramada nueva;
+        try {
+            nueva = new OperacionProgramada(actual.getId(), valor,
+                    String.valueOf(codOrigen), esTransferencia ? String.valueOf(codDestino) : null,
+                    fechaHora, tipo, frecuencia, OperacionProgramada.PENDIENTE, actual.getIdUsuario());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+
+        SimpleLinkedList<OperacionProgramada> pendientes = operacionesProgramadas.aListaOrdenada();
+        operacionesProgramadas.clear();
+        for (OperacionProgramada op : pendientes) {
+            operacionesProgramadas.encolar(op.getId().equals(actual.getId()) ? nueva : op);
+        }
+        return true;
     }
 }
