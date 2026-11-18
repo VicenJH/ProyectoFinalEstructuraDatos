@@ -102,6 +102,7 @@
                                 <Button text="Crear" onAction="#crearUsuario" styleClass="primary-button"/>
                                 <Button text="Guardar cambios" onAction="#modificarUsuario" styleClass="secondary-button"/>
                                 <Button text="Dar de baja" onAction="#eliminarUsuario" styleClass="danger-button"/>
+                                <Button text="Reactivar" onAction="#reactivarUsuario" styleClass="secondary-button"/>
                             </FlowPane>
                         </VBox>
                         <HBox spacing="10" alignment="CENTER_LEFT">

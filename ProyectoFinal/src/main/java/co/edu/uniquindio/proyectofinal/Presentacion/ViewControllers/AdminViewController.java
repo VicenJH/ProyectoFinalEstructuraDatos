@@ -298,6 +298,12 @@ public class AdminViewController {
         }
     }
 
+    @FXML private void reactivarUsuario() {
+        if (sistema.reactivarUsuario(txtUsuarioId.getText()))
+            mutacion("Usuario reactivado; recuperó sus billeteras y su historial.");
+        else aviso("No existe un usuario dado de baja con esa identificación.");
+    }
+
     @FXML private void crearBilletera() {
         try {
             boolean creada = sistema.crearBilleteraAUsuario(txtBilleteraUsuario.getText(), entero(txtBilleteraCodigo),

@@ -191,6 +191,29 @@ public class FintechController {
         return true;
     }
 
+
+    /**
+     * Reactiva a un usuario dado de baja: vuelve a ser un usuario activo, regresa al árbol de
+     * puntos y recupera sus billeteras (con el saldo e historial que conservaban).
+     * Las operaciones programadas canceladas por la baja NO se restauran: deben programarse de nuevo.
+     *
+     * @return true si el usuario existía y estaba dado de baja; false en otro caso.
+     */
+    public boolean reactivarUsuario(String id) {
+        if (id == null) return false;
+        Usuario usuario = usuariosPorId.buscar(id.trim());
+        if (usuario == null || usuario.isActivo()) return false;
+        usuario.setActivo(true);
+        // getBilleteras() entrega copias: se reactivan las billeteras reales, buscándolas por código.
+        for (Billetera copia : usuario.getBilleteras()) {
+            Billetera real = billeterasPorCodigo.buscar(copia.getCodigo());
+            if (real != null) real.setActivo(true);
+        }
+        arbolUsuariosPorPuntos.insertar(usuario);
+        return true;
+    }
+
+
     // ------------------------------------------------------------------
     // GESTIÓN DE BILLETERAS
     // ------------------------------------------------------------------
