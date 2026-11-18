@@ -225,6 +225,15 @@ public class AdminViewController {
         tablaAuditoria.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialAuditoria())));
         tablaAlertas.setItems(FXCollections.observableArrayList(lista(sistema.obtenerHistorialAlertasGlobal())));
 
+        tablaUsuarios.refresh();
+        tablaBilleteras.refresh();
+        tablaTransacciones.refresh();
+        tablaProgramadas.refresh();
+        tablaBeneficios.refresh();
+        tablaCanjes.refresh();
+        tablaAuditoria.refresh();
+        tablaAlertas.refresh();
+
         ArrayList<Transaccion> recientes = new ArrayList<>();
         for (int i = Math.max(0, transacciones.size() - 8); i < transacciones.size(); i++) recientes.add(transacciones.get(i));
         java.util.Collections.reverse(recientes);
